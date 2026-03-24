@@ -1,4 +1,4 @@
-package com.example.balance.ui.componentes
+package com.example.Tuiteraz.ui.componentes
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.launch
-import com.example.balance.* // Para heredar DUR_ENTRADA, DUR_SALIDA, etc.
+import com.example.Tuiteraz.* // Para heredar DUR_ENTRADA, DUR_SALIDA, etc.
 
 @Composable
 fun EntradaAnimada(visible: Boolean, retraso: Int, content: @Composable () -> Unit) {

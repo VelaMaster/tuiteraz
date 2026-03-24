@@ -1,4 +1,4 @@
-package com.example.balance.ui.componentes
+package com.example.Tuiteraz.ui.componentes
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-import com.example.balance.DUR_SALIDA
+import com.example.Tuiteraz.DUR_SALIDA
 
 @Composable
 fun NotificacionTopMD3(

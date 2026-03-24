@@ -1,5 +1,5 @@
 // RUTA: app/src/main/java/com/example/balance/ui/theme/Theme.kt
-package com.example.balance.ui.theme
+package com.example.Tuiteraz.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

@@ -1,4 +1,4 @@
-package com.example.balance.ui.componentes
+package com.example.Tuiteraz.ui.componentes
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring

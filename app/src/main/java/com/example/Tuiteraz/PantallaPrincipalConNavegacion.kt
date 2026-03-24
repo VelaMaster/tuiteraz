@@ -1,4 +1,5 @@
-package com.example.balance
+package com.example.Tuiteraz
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -52,23 +53,17 @@ private val destinos = listOf(
     DestNav("Ajustes",   Icons.Filled.Settings,  Icons.Outlined.Settings)
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COMPORTAMIENTO DE SCROLL:
-//
-// enterAlwaysScrollBehavior + TopAppBar (NO LargeTopAppBar):
-//   • Al bajar → la barra se desliza completamente hacia arriba y DESAPARECE
-//   • Al subir → la barra reaparece deslizándose hacia abajo
-//   → Comportamiento idéntico a Instagram / YouTube
-//
-// LargeTopAppBar con enterAlways solo COLAPSA el título grande a pequeño
-// pero la barra NUNCA desaparece → eso es el comportamiento de WhatsApp
-// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PantallaPrincipalConNavegacion(fraseActual: Frase) {
+fun PantallaPrincipalConNavegacion(
+    fraseActual: Frase,
+    // NUEVO
+    // NUEVO
+    isNotificacionesActivas: Boolean,      // NUEVO
+    onNotificacionesChange: (Boolean) -> Unit // NUEVO
+) {
     var itemSeleccionado by remember { mutableIntStateOf(0) }
 
-    // enterAlwaysScrollBehavior = desaparece al bajar, reaparece al subir
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         state = rememberTopAppBarState()
     )
@@ -79,7 +74,6 @@ fun PantallaPrincipalConNavegacion(fraseActual: Frase) {
             .nestedScroll(scrollBehavior.nestedScrollConnection),
 
         topBar = {
-            // TopAppBar simple (no Large) → se va COMPLETAMENTE con el scroll
             TopAppBar(
                 title = {
                     Text(
@@ -144,7 +138,11 @@ fun PantallaPrincipalConNavegacion(fraseActual: Frase) {
             when (pantalla) {
                 0 -> PantallaInicio(frase = fraseActual, paddingValues = paddingValues)
                 1 -> PantallaFavoritos(paddingValues = paddingValues)
-                2 -> PantallaAjustes(paddingValues = paddingValues)
+                2 -> PantallaAjustes(
+                    paddingValues = paddingValues,
+                    isNotificacionesActivas = isNotificacionesActivas,
+                    onNotificacionesChange = onNotificacionesChange
+                )
             }
         }
     }

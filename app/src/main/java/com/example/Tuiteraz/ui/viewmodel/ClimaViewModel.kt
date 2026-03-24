@@ -1,10 +1,10 @@
-package com.example.balance.ui.viewmodel
+package com.example.Tuiteraz.ui.viewmodel
 
 import android.app.Application
 import android.location.Geocoder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.balance.data.network.RedClima
+import com.example.Tuiteraz.data.network.RedClima
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers

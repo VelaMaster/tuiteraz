@@ -1,4 +1,4 @@
-package com.example.balance.ui.theme
+package com.example.Tuiteraz.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,4 +1,4 @@
-package com.example.balance.data.network
+package com.example.Tuiteraz.data.network
 
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

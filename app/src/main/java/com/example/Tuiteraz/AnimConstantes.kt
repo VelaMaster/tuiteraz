@@ -1,5 +1,5 @@
 // RUTA: app/src/main/java/com/example/balance/AnimConstantes.kt
-package com.example.balance
+package com.example.Tuiteraz
 
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring

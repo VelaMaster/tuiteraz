@@ -1,4 +1,4 @@
-package com.example.balance
+package com.example.Tuiteraz
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -45,8 +45,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 
 // Tus importaciones de componentes y viewmodel
-import com.example.balance.ui.componentes.*
-import com.example.balance.ui.viewmodel.ClimaViewModel
+import com.example.Tuiteraz.ui.componentes.*
+import com.example.Tuiteraz.ui.viewmodel.ClimaViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalPermissionsApi::class)
 @Composable

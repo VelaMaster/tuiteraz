@@ -3,11 +3,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 android {
-    namespace   = "com.example.balance"
+    namespace   = "com.example.Tuiteraz"
     compileSdk  = 36
 
     defaultConfig {
-        applicationId             = "com.example.balance"
+        applicationId             = "com.example.Tuiteraz"
         minSdk                    = 28
         targetSdk                 = 36
         versionCode               = 1
@@ -51,10 +51,23 @@ dependencies {
     // LA VERSIÓN SALVAVIDAS DEL CALENDARIO:
     implementation("com.kizitonwose.calendar:compose:2.10.0")
     implementation(libs.androidx.compose.foundation.layout)
+// --- SUPABASE ---
+    // Versión estable para Kotlin
+    val supabaseVersion = "2.2.3"
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:$supabaseVersion") // Autenticación
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion") // Base de datos
+    implementation("io.github.jan-tennert.supabase:compose-auth:$supabaseVersion") // UI Auth Compose
+    implementation("io.ktor:ktor-client-android:2.3.9") // Motor de red que usa Supabase
 
+    // --- GOOGLE SIGN-IN (Credential Manager) ---
+    implementation("androidx.credentials:credentials:1.2.1")
+    implementation("androidx.credentials:credentials-play-services-auth:1.2.1")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
     // Red y JSON (Retrofit + Gson)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // Para trabajos en segundo plano (Notificaciones diarias)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 // Para manejar permisos en Compose fácilmente
     implementation("com.google.accompanist:accompanist-permissions:0.35.0-alpha")
 // Servicios de Ubicación

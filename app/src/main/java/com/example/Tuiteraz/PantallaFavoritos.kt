@@ -1,10 +1,8 @@
-// RUTA: app/src/main/java/com/example/balance/PantallaFavoritos.kt
-package com.example.balance
+package com.example.Tuiteraz
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -52,16 +50,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.balance.ui.componentes.efectoPulsacionSutil
+import com.example.Tuiteraz.ui.componentes.efectoPulsacionSutil
 import kotlinx.coroutines.delay
 
 val frasesFavoritasEjemplo = listOf(
-    Frase("El único modo de hacer un gran trabajo es amar lo que haces.", "Steve Jobs"),
-    Frase("No cuentes los días, haz que los días cuenten.", "Muhammad Ali"),
-    Frase("La vida es lo que pasa mientras estás ocupado haciendo otros planes.", "John Lennon"),
-    Frase("Sé el cambio que quieres ver en el mundo.", "Mahatma Gandhi"),
-    Frase("En medio de la dificultad reside la oportunidad.", "Albert Einstein"),
-    Frase("El éxito es la suma de pequeños esfuerzos repetidos día tras día.", "Robert Collier")
+    Frase(1, "El único modo de hacer un gran trabajo es amar lo que haces.", "Steve Jobs"),
+    Frase(2, "No cuentes los días, haz que los días cuenten.", "Muhammad Ali"),
+    Frase(3, "La vida es lo que pasa mientras estás ocupado haciendo otros planes.", "John Lennon"),
+    Frase(4, "Sé el cambio que quieres ver en el mundo.", "Mahatma Gandhi"),
+    Frase(5, "En medio de la dificultad reside la oportunidad.", "Albert Einstein"),
+    Frase(6, "El éxito es la suma de pequeños esfuerzos repetidos día tras día.", "Robert Collier")
 )
 
 @Composable

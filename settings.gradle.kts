@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Balance"
+rootProject.name = "Tuiteraz"
 include(":app")
