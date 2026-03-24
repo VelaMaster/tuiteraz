@@ -53,15 +53,15 @@ import com.example.Tuiteraz.ui.viewmodel.ClimaViewModel
 fun PantallaInicio(
     frase         : Frase,
     paddingValues : PaddingValues = PaddingValues(),
-    climaViewModel: ClimaViewModel = viewModel() // Instanciamos el ViewModel
+    climaViewModel: ClimaViewModel = viewModel(),
+    // --- NUEVAS "MANOS" PARA ATRAPAR LOS DATOS DE FAVORITOS ---
+    esFavorita    : Boolean = false,
+    onToggleFavorito: () -> Unit = {}
 ) {
     val contexto = LocalContext.current
     val clienteUbicacion = remember { LocationServices.getFusedLocationProviderClient(contexto) }
 
-    // Estado del permiso de ubicación (usamos COARSE_LOCATION para no gastar tanta batería)
     val permisoUbicacion = rememberPermissionState(permission = Manifest.permission.ACCESS_COARSE_LOCATION)
-
-    // Observamos el estado del clima desde el ViewModel
     val estadoClima by climaViewModel.estadoClima.collectAsState()
 
     var visible by remember { mutableStateOf(false) }
@@ -89,24 +89,18 @@ fun PantallaInicio(
     val umbralRefreshPx = remember(density) { with(density) { 110.dp.toPx() } }
     val haptic = LocalHapticFeedback.current
 
-    // -------------------------------------------------------------------------
-    // LÓGICA DE UBICACIÓN
-    // -------------------------------------------------------------------------
     val obtenerUbicacionYClima = {
         if (ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             clienteUbicacion.lastLocation.addOnSuccessListener { ubicacion: Location? ->
                 if (ubicacion != null) {
-                    // ¡Tenemos GPS! Llamamos al clima con tu ubicación real
                     climaViewModel.cargarClima(ubicacion.latitude, ubicacion.longitude)
                 } else {
-                    // Si falla el GPS por algo (ej. apagado), cargamos un por defecto
                     climaViewModel.cargarClima(17.0654, -96.7236)
                 }
             }
         }
     }
 
-    // Efecto que corre al iniciar la pantalla
     LaunchedEffect(permisoUbicacion.status) {
         if (!permisoUbicacion.status.isGranted) {
             permisoUbicacion.launchPermissionRequest()
@@ -119,14 +113,12 @@ fun PantallaInicio(
         if (!refrescandoClima) {
             refrescandoClima = true
             scope.launch {
-                // Verificamos el permiso antes de actualizar
                 if (permisoUbicacion.status.isGranted) {
                     obtenerUbicacionYClima()
                 } else {
                     permisoUbicacion.launchPermissionRequest()
                 }
 
-                // Animaciones visuales
                 launch {
                     delay(200)
                     offsetFrase.animateTo(30f, spring(Spring.DampingRatioHighBouncy, Spring.StiffnessLow))
@@ -138,13 +130,11 @@ fun PantallaInicio(
                     offsetCalendario.animateTo(0f, SpringMuyRebotante)
                 }
 
-                // Dejamos de mostrar el indicador de carga
                 delay(1500)
                 refrescandoClima = false
             }
         }
     }
-    // -------------------------------------------------------------------------
 
     val conexionScroll = remember {
         object : NestedScrollConnection {
@@ -285,7 +275,6 @@ fun PantallaInicio(
                             .padding(horizontal = padH)
                     ) {
                         EntradaAnimada(visible, DELAY_SECCION_1) {
-                            // AQUÍ PASAMOS LOS DATOS DEL VIEWMODEL A LA TARJETA
                             TarjetaClimaDinamica(
                                 estaCargando = refrescandoClima,
                                 esTablet     = esTablet,
@@ -308,7 +297,13 @@ fun PantallaInicio(
                     ) {
                         EntradaAnimada(visible, DELAY_SECCION_2) {
                             Box(Modifier.offset { IntOffset(0, offsetFrase.value.roundToInt()) }) {
-                                TarjetaFrase(frase, esTablet)
+                                // --- AQUÍ LE PASAMOS LOS DATOS A LA TARJETA ---
+                                TarjetaFrase(
+                                    frase = frase,
+                                    esTablet = esTablet,
+                                    esFavorita = esFavorita,
+                                    onToggleFavorito = onToggleFavorito
+                                )
                             }
                         }
                     }

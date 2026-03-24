@@ -25,14 +25,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -40,6 +45,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.Tuiteraz.data.network.SupabaseManager
+import com.example.Tuiteraz.ui.viewmodel.FavoritosViewModel
+import io.github.jan.supabase.gotrue.SessionStatus
+import io.github.jan.supabase.gotrue.auth
+import kotlinx.coroutines.launch
 
 private data class DestNav(
     val etiqueta : String,
@@ -57,12 +68,20 @@ private val destinos = listOf(
 @Composable
 fun PantallaPrincipalConNavegacion(
     fraseActual: Frase,
-    // NUEVO
-    // NUEVO
-    isNotificacionesActivas: Boolean,      // NUEVO
-    onNotificacionesChange: (Boolean) -> Unit // NUEVO
+    isNotificacionesActivas: Boolean,
+    onNotificacionesChange: (Boolean) -> Unit,
+    favViewModel: FavoritosViewModel = viewModel()
 ) {
     var itemSeleccionado by remember { mutableIntStateOf(0) }
+
+    // --- NUEVO: Estado de la sesión, Snackbar y Corrutinas ---
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val sessionStatus by SupabaseManager.client.auth.sessionStatus.collectAsState()
+    val isLogged = sessionStatus is SessionStatus.Authenticated
+
+    val listaFavoritos by favViewModel.listaFavoritos.collectAsState()
+    val esFavoritaActual = listaFavoritos.any { it.id == fraseActual.id }
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
         state = rememberTopAppBarState()
@@ -72,6 +91,9 @@ fun PantallaPrincipalConNavegacion(
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
+
+        // --- NUEVO: Agregamos el Snackbar al Scaffold ---
+        snackbarHost = { SnackbarHost(snackbarHostState) },
 
         topBar = {
             TopAppBar(
@@ -136,8 +158,28 @@ fun PantallaPrincipalConNavegacion(
             label = "nav_pantallas"
         ) { pantalla ->
             when (pantalla) {
-                0 -> PantallaInicio(frase = fraseActual, paddingValues = paddingValues)
-                1 -> PantallaFavoritos(paddingValues = paddingValues)
+                0 -> PantallaInicio(
+                    frase = fraseActual,
+                    paddingValues = paddingValues,
+                    esFavorita = esFavoritaActual,
+                    onToggleFavorito = {
+                        // --- LÓGICA DE VALIDACIÓN DE SESIÓN ---
+                        if (isLogged) {
+                            favViewModel.alternarFavorito(fraseActual)
+                        } else {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Inicia sesión en ajustes para guardar poder hacer una copia de tus favoritas.",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
+                    }
+                )
+                1 -> PantallaFavoritos(
+                    paddingValues = paddingValues,
+                    viewModel = favViewModel
+                )
                 2 -> PantallaAjustes(
                     paddingValues = paddingValues,
                     isNotificacionesActivas = isNotificacionesActivas,

@@ -32,13 +32,15 @@ import com.example.Tuiteraz.Frase
 import kotlinx.coroutines.launch
 
 @Composable
-fun TarjetaFrase(frase: Frase, esTablet: Boolean = false) {
+fun TarjetaFrase(
+    frase: Frase,
+    esTablet: Boolean = false,
+    esFavorita: Boolean = false,             // <--- NUEVO: Recibe si es favorita
+    onToggleFavorito: () -> Unit = {}        // <--- NUEVO: Avisa cuando se toca el corazón
+) {
     val contexto = LocalContext.current
     val escala = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
-
-    // Estado falso por ahora, luego lo conectaremos a la base de datos
-    var esFavorita by remember { mutableStateOf(false) }
 
     // Animaciones para el corazón
     val colorCorazon by animateColorAsState(
@@ -65,7 +67,7 @@ fun TarjetaFrase(frase: Frase, esTablet: Boolean = false) {
         Column(
             modifier = Modifier.padding(
                 top = if (esTablet) 44.dp else 28.dp,
-                bottom = if (esTablet) 24.dp else 16.dp, // Reduje un poco abajo para los botones
+                bottom = if (esTablet) 24.dp else 16.dp,
                 start = if (esTablet) 48.dp else 32.dp,
                 end = if (esTablet) 48.dp else 32.dp
             ),
@@ -108,30 +110,14 @@ fun TarjetaFrase(frase: Frase, esTablet: Boolean = false) {
             )
 
             Spacer(Modifier.height(if (esTablet) 32.dp else 24.dp))
+
+            // Fila de botones de acción
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = {
-                        esFavorita = !esFavorita
-                        scope.launch {
-                            // Efecto de latido al presionar
-                            escalaCorazon.animateTo(1.4f, tween(100))
-                            escalaCorazon.animateTo(1f, spring(dampingRatio = Spring.DampingRatioHighBouncy))
-                        }
-                    },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = if (esFavorita) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Añadir a favoritos",
-                        tint = colorCorazon,
-                        modifier = Modifier.scale(escalaCorazon.value)
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
+                // Botón Compartir
                 IconButton(
                     onClick = {
                         val textoACompartir = "«${frase.texto}»\n— ${frase.autor}\n\nDescubre más en Tu i teraz."
@@ -149,6 +135,27 @@ fun TarjetaFrase(frase: Frase, esTablet: Boolean = false) {
                         imageVector = Icons.Outlined.Share,
                         contentDescription = "Compartir frase",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                // Botón Favorito
+                IconButton(
+                    onClick = {
+                        onToggleFavorito() // <--- Avisamos al cerebro que hubo un toque
+                        scope.launch {
+                            escalaCorazon.animateTo(1.4f, tween(100))
+                            escalaCorazon.animateTo(1f, spring(dampingRatio = Spring.DampingRatioHighBouncy))
+                        }
+                    },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (esFavorita) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = "Añadir a favoritos",
+                        tint = colorCorazon,
+                        modifier = Modifier.scale(escalaCorazon.value)
                     )
                 }
             }
