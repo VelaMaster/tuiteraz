@@ -13,10 +13,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-// IMPORTANTE: Cambiamos a AndroidViewModel para tener contexto y usar Geocoder
 class ClimaViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _estadoClima = MutableStateFlow(DatosClima(ciudad = "Buscando...")) // Empezamos buscando
+    private val _estadoClima = MutableStateFlow(DatosClima(ciudad = "Buscando..."))
     val estadoClima: StateFlow<DatosClima> = _estadoClima.asStateFlow()
 
     fun cargarClima(latitud: Double, longitud: Double) {
@@ -25,8 +24,6 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
                 _estadoClima.value = _estadoClima.value.copy(huboErrorAlActualizar = false)
 
                 val respuesta = RedClima.api.obtenerClimaActual(latitud, longitud)
-
-                // Intentamos obtener el nombre del pueblo/ciudad
                 val nombreCiudad = obtenerNombreCiudad(latitud, longitud)
 
                 _estadoClima.value = _estadoClima.value.copy(
@@ -38,7 +35,7 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _estadoClima.value = _estadoClima.value.copy(
                     huboErrorAlActualizar = true,
-                    ciudad = "Desconocido" // Si falla todo
+                    ciudad = "Oaxaca"
                 )
             }
         }
@@ -53,23 +50,34 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
                 if (!direcciones.isNullOrEmpty()) {
                     val dir = direcciones[0]
 
-                    // Nuevo orden estratégico para México (Oaxaca/Etla)
-                    dir.subLocality          // 1. Barrio / Colonia (Ej. Capellanía)
-                        ?: dir.subAdminArea  // 2. Municipio (Ej. Villa de Etla)
-                        ?: dir.locality      // 3. Ciudad (Ej. Oaxaca)
-                        ?: dir.adminArea     // 4. Estado
+                    // --- NUEVA ESTRATEGIA DE PRIORIDAD ---
+                    // 1. Locality suele ser "Villa de Etla" o "Oaxaca"
+                    // 2. SubAdminArea suele ser el Distrito
+                    // 3. SubLocality es el Barrio (lo dejamos al final)
+                    val nombre = dir.locality
+                        ?: dir.subAdminArea
+                        ?: dir.subLocality
+                        ?: dir.adminArea
                         ?: "Ubicación actual"
+
+                    limpiarNombre(nombre)
                 } else {
                     "Ubicación actual"
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
                 "Ubicación actual"
             }
         }
     }
 
-    // ... (Tu función interpretarCodigoClima se queda igual) ...
+    // Función extra para que el nombre quepa siempre en la tarjeta
+    private fun limpiarNombre(nombre: String): String {
+        return nombre
+            .replace("Municipio de ", "", ignoreCase = true)
+            .replace("Heroica Ciudad de ", "", ignoreCase = true)
+            .trim()
+    }
+
     private fun interpretarCodigoClima(codigo: Int): String {
         return when (codigo) {
             0 -> "Cielo despejado"
@@ -84,7 +92,6 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-// El data class se queda igual
 data class DatosClima(
     val ciudad: String = "Oaxaca",
     val temperatura: Int = 25,

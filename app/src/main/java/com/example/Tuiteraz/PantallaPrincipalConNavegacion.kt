@@ -1,15 +1,7 @@
 package com.example.Tuiteraz
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -19,26 +11,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,11 +26,7 @@ import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.launch
 
-private data class DestNav(
-    val etiqueta : String,
-    val iconoOn  : ImageVector,
-    val iconoOff : ImageVector
-)
+private data class DestNav(val etiqueta: String, val iconoOn: ImageVector, val iconoOff: ImageVector)
 
 private val destinos = listOf(
     DestNav("Inicio",    Icons.Filled.Home,     Icons.Outlined.Home),
@@ -73,8 +43,9 @@ fun PantallaPrincipalConNavegacion(
     favViewModel: FavoritosViewModel = viewModel()
 ) {
     var itemSeleccionado by remember { mutableIntStateOf(0) }
+    // Estado para saber si estamos dentro de "Acerca de"
+    var verAcercaDe by remember { mutableStateOf(false) }
 
-    // --- NUEVO: Estado de la sesión, Snackbar y Corrutinas ---
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val sessionStatus by SupabaseManager.client.auth.sessionStatus.collectAsState()
@@ -83,76 +54,73 @@ fun PantallaPrincipalConNavegacion(
     val listaFavoritos by favViewModel.listaFavoritos.collectAsState()
     val esFavoritaActual = listaFavoritos.any { it.id == fraseActual.id }
 
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(
-        state = rememberTopAppBarState()
-    )
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(state = rememberTopAppBarState())
 
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-
-        // --- NUEVO: Agregamos el Snackbar al Scaffold ---
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHostState) },
-
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text       = "Tu i teraz",
-                        fontWeight = FontWeight.ExtraBold,
-                        style      = MaterialTheme.typography.titleLarge
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor         = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor      = MaterialTheme.colorScheme.onBackground
-                ),
-                scrollBehavior = scrollBehavior
-            )
+            // Ocultamos la barra principal si estamos en "Acerca de", ya que ella tiene su propia flecha de volver
+            if (!(itemSeleccionado == 2 && verAcercaDe)) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text       = "Tu i teraz",
+                            fontWeight = FontWeight.ExtraBold,
+                            style      = MaterialTheme.typography.titleLarge
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor         = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor      = MaterialTheme.colorScheme.onBackground
+                    ),
+                    scrollBehavior = scrollBehavior
+                )
+            }
         },
-
         bottomBar = {
-            NavigationBar {
-                destinos.forEachIndexed { index, destino ->
-                    val seleccionado = itemSeleccionado == index
+            // Ocultamos la barra inferior en "Acerca de" para dar más espacio y enfoque
+            if (!(itemSeleccionado == 2 && verAcercaDe)) {
+                NavigationBar {
+                    destinos.forEachIndexed { index, destino ->
+                        val seleccionado = itemSeleccionado == index
+                        val escala by animateFloatAsState(
+                            targetValue = if (seleccionado) 1.20f else 1f,
+                            animationSpec = SpringMuyRebotante,
+                            label = "escala_nav"
+                        )
 
-                    val escala by animateFloatAsState(
-                        targetValue   = if (seleccionado) 1.20f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioHighBouncy,
-                            stiffness    = Spring.StiffnessMedium
-                        ),
-                        label = "escala_nav_$index"
-                    )
-
-                    NavigationBarItem(
-                        selected = seleccionado,
-                        onClick  = { itemSeleccionado = index },
-                        icon     = {
-                            Icon(
-                                imageVector        = if (seleccionado) destino.iconoOn else destino.iconoOff,
-                                contentDescription = destino.etiqueta,
-                                modifier           = Modifier.size(24.dp).scale(escala)
-                            )
-                        },
-                        label = { Text(destino.etiqueta) }
-                    )
+                        NavigationBarItem(
+                            selected = seleccionado,
+                            onClick  = {
+                                itemSeleccionado = index
+                                verAcercaDe = false // Reseteamos el sub-estado al cambiar de pestaña
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (seleccionado) destino.iconoOn else destino.iconoOff,
+                                    contentDescription = destino.etiqueta,
+                                    modifier = Modifier.size(24.dp).scale(escala)
+                                )
+                            },
+                            label = { Text(destino.etiqueta) }
+                        )
+                    }
                 }
             }
         }
     ) { paddingValues ->
+        // Animación principal entre pestañas (Inicio, Favoritos, Ajustes)
         AnimatedContent(
-            targetState   = itemSeleccionado,
-            modifier      = Modifier.fillMaxSize(),
+            targetState = itemSeleccionado,
             transitionSpec = {
                 if (targetState > initialState) {
-                    (slideInHorizontally(tween(350)) { it / 2 } + fadeIn(tween(350)))
-                        .togetherWith(slideOutHorizontally(tween(350)) { -it / 2 } + fadeOut(tween(200)))
+                    (slideInHorizontally(tween(DUR_EFECTO)) { it / 2 } + fadeIn(tween(DUR_EFECTO)))
+                        .togetherWith(slideOutHorizontally(tween(DUR_EFECTO)) { -it / 2 } + fadeOut(tween(DUR_RAPIDO)))
                 } else {
-                    (slideInHorizontally(tween(350)) { -it / 2 } + fadeIn(tween(350)))
-                        .togetherWith(slideOutHorizontally(tween(350)) { it / 2 } + fadeOut(tween(200)))
+                    (slideInHorizontally(tween(DUR_EFECTO)) { -it / 2 } + fadeIn(tween(DUR_EFECTO)))
+                        .togetherWith(slideOutHorizontally(tween(DUR_EFECTO)) { it / 2 } + fadeOut(tween(DUR_RAPIDO)))
                 }
             },
             label = "nav_pantallas"
@@ -163,13 +131,12 @@ fun PantallaPrincipalConNavegacion(
                     paddingValues = paddingValues,
                     esFavorita = esFavoritaActual,
                     onToggleFavorito = {
-                        // --- LÓGICA DE VALIDACIÓN DE SESIÓN ---
                         if (isLogged) {
                             favViewModel.alternarFavorito(fraseActual)
                         } else {
                             scope.launch {
                                 snackbarHostState.showSnackbar(
-                                    message = "Inicia sesión en ajustes para guardar poder hacer una copia de tus favoritas.",
+                                    message = "Inicia sesión en ajustes para poder sincronizar tus favoritas.",
                                     duration = SnackbarDuration.Short
                                 )
                             }
@@ -180,11 +147,33 @@ fun PantallaPrincipalConNavegacion(
                     paddingValues = paddingValues,
                     viewModel = favViewModel
                 )
-                2 -> PantallaAjustes(
-                    paddingValues = paddingValues,
-                    isNotificacionesActivas = isNotificacionesActivas,
-                    onNotificacionesChange = onNotificacionesChange
-                )
+                2 -> {
+                    // --- TRANSICIÓN INTERNA DE LA PESTAÑA AJUSTES ---
+                    AnimatedContent(
+                        targetState = verAcercaDe,
+                        transitionSpec = {
+                            if (targetState) { // Entrando a "Acerca de"
+                                (slideInHorizontally(spring(Spring.DampingRatioLowBouncy)) { it } + fadeIn())
+                                    .togetherWith(slideOutHorizontally(tween(DUR_RAPIDO)) { -it / 3 } + fadeOut())
+                            } else { // Regresando a "Ajustes"
+                                (slideInHorizontally(spring(Spring.DampingRatioLowBouncy)) { -it / 3 } + fadeIn())
+                                    .togetherWith(slideOutHorizontally(tween(DUR_RAPIDO)) { it } + fadeOut())
+                            }
+                        },
+                        label = "sub_nav_ajustes"
+                    ) { mostrarAcercaDe ->
+                        if (mostrarAcercaDe) {
+                            PantallaAcercaDe(onBack = { verAcercaDe = false })
+                        } else {
+                            PantallaAjustes(
+                                paddingValues = paddingValues,
+                                isNotificacionesActivas = isNotificacionesActivas,
+                                onNotificacionesChange = onNotificacionesChange,
+                                onAcercaDeClick = { verAcercaDe = true }
+                            )
+                        }
+                    }
+                }
             }
         }
     }

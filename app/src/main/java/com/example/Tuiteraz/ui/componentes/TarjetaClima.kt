@@ -16,12 +16,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.Tuiteraz.* // Para tus constantes de animación
-
-@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+import com.example.Tuiteraz.* @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TarjetaClimaDinamica(
     estaCargando : Boolean,
@@ -98,6 +97,7 @@ fun TarjetaClimaDinamica(
             ) { cargando ->
                 if (cargando) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        // Mantenemos tu Pentágono/Óvalo Expressive original
                         ContainedLoadingIndicator(
                             modifier       = Modifier.size(72.dp),
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -111,24 +111,30 @@ fun TarjetaClimaDinamica(
                             .padding(horizontal = if (esTablet) 40.dp else 24.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 1. COLUMNA DE TEXTOS (Con weight(1f) para que sea responsiva)
-                        // 1. COLUMNA DE TEXTOS (Responsiva y multilínea)
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(end = 12.dp), // Espacio para que no choque con los grados
+                                .padding(end = 12.dp),
                             verticalArrangement = Arrangement.Center
                         ) {
+                            // --- LÓGICA DE RESPONSIVIDAD DE LETRAS ---
+                            val fontSizeCiudad = when {
+                                ciudad.length > 20 -> 18.sp
+                                ciudad.length > 14 -> 22.sp
+                                else -> if (esTablet) 32.sp else 28.sp
+                            }
+
                             Text(
                                 text = ciudad,
-                                style = if (esTablet) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineMedium,
+                                fontSize = fontSizeCiudad,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                lineHeight = if (esTablet) 40.sp else 32.sp // Da aire si salta de línea
-                                // Eliminamos el maxLines=1 y el Ellipsis para que fluya hacia abajo
+                                lineHeight = (fontSizeCiudad.value * 1.1).sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
 
-                            Spacer(modifier = Modifier.height(4.dp)) // Mini espacio entre ciudad y descripción
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -136,7 +142,9 @@ fun TarjetaClimaDinamica(
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f),
                                     lineHeight = 20.sp,
-                                    modifier = Modifier.weight(1f, fill = false) // Permite que el texto baje de línea sin empujar el error
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
                                 if (huboError) {
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -149,11 +157,10 @@ fun TarjetaClimaDinamica(
                             }
                         }
 
-                        // 2. FILA DE TEMPERATURA (Toma solo el espacio que necesita)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = temperatura.toString(),
-                                style = MaterialTheme.typography.displayLarge,
+                                style = if (esTablet) MaterialTheme.typography.displayLarge else MaterialTheme.typography.displayMedium,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                             )
