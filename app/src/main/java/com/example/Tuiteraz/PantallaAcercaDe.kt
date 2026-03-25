@@ -86,7 +86,7 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Tu i teraz es una herramienta diseñada para ayudarte a ver detalles de tu día y conectar con un pensamiento día a día. El nombre de la aplicación viene del polaco, que significa \"aquí y ahora\". Espero les pueda ayudar y les guste.",
+                    "Tuiteraz es una herramienta diseñada para ayudarte a ver detalles de tu día y conectar con un pensamiento día a día. El nombre de la aplicación viene del polaco, que significa \"aquí y ahora\". Espero les pueda ayudar y les guste.",
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Justify,
                     lineHeight = 24.sp
@@ -113,8 +113,8 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                     MaterialTheme.colorScheme.primaryContainer
                 )
                 TarjetaPreviewV1(
-                    "Widgets",
-                    "Visualiza la frase del día directamente en tu pantalla de inicio con widgets personalizables.",
+                    "Widget de Motivación",
+                    "Un widget que te da la motivación con tu frase diaria directamente en tu pantalla de inicio.",
                     Icons.Outlined.Widgets,
                     MaterialTheme.colorScheme.secondaryContainer
                 )
@@ -134,14 +134,14 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                     "Exportación HD",
                     "Comparte pensamientos en alta resolución con diseños minimalistas y elegantes.",
                     Icons.Outlined.Hd,
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    MaterialTheme.colorScheme.primaryContainer // <- Aquí quitamos el ".copy(alpha = 0.7f)" feo
                 )
             }
 
             Spacer(Modifier.height(48.dp))
 
             // --- SECCIÓN DE CONTACTO FINAL ---
-            Divider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
             Spacer(Modifier.height(24.dp))
 
             Text(

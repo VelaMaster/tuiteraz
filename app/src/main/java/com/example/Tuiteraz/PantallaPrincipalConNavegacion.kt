@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -48,10 +49,10 @@ fun PantallaPrincipalConNavegacion(
 
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val sessionStatus by SupabaseManager.client.auth.sessionStatus.collectAsState()
+    val sessionStatus by SupabaseManager.client.auth.sessionStatus.collectAsStateWithLifecycle()
     val isLogged = sessionStatus is SessionStatus.Authenticated
 
-    val listaFavoritos by favViewModel.listaFavoritos.collectAsState()
+    val listaFavoritos by favViewModel.listaFavoritos.collectAsStateWithLifecycle()
     val esFavoritaActual = listaFavoritos.any { it.id == fraseActual.id }
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(state = rememberTopAppBarState())

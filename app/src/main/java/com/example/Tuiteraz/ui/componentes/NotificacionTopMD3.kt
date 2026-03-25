@@ -76,14 +76,17 @@ fun NotificacionTopMD3(
                             onDismiss()
                         } else {
                             scope.launch {
-                                val anim = Animatable(swipeOffset)
-                                anim.animateTo(
-                                    targetValue   = 0f,
+                                // OPTIMIZACIÓN: Animación directa al estado, sin instanciar objetos nuevos
+                                animate(
+                                    initialValue = swipeOffset,
+                                    targetValue = 0f,
                                     animationSpec = spring(
                                         dampingRatio = Spring.DampingRatioMediumBouncy,
                                         stiffness    = Spring.StiffnessMedium
                                     )
-                                ) { swipeOffset = value }
+                                ) { value, _ ->
+                                    swipeOffset = value
+                                }
                             }
                         }
                     }

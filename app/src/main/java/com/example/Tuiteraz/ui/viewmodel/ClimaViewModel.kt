@@ -5,6 +5,7 @@ import android.location.Geocoder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.Tuiteraz.data.network.RedClima
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers
@@ -15,16 +16,36 @@ import java.util.Locale
 
 class ClimaViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _estadoClima = MutableStateFlow(DatosClima(ciudad = "Buscando..."))
+    private val _estadoClima = MutableStateFlow(DatosClima(ciudad = "Cargando..."))
     val estadoClima: StateFlow<DatosClima> = _estadoClima.asStateFlow()
 
-    fun cargarClima(latitud: Double, longitud: Double) {
+    // --- FRENO DE PETICIONES (Ahorro de WiFi y Batería) ---
+    // Guardamos cuándo fue la última vez que fuimos a internet
+    private var ultimoLlamado: Long = 0
+    private val TIEMPO_ESPERA_MS = 10 * 60 * 1000 // 10 Minutos de caché
+
+    fun cargarClima(latitud: Double, longitud: Double, forzar: Boolean = false) {
+        val ahora = System.currentTimeMillis()
+
+        // Si no han pasado 10 minutos y no estás tirando para recargar (forzar),
+        // abortamos la petición para ahorrar datos y batería.
+        if (!forzar && ahora - ultimoLlamado < TIEMPO_ESPERA_MS) {
+            return
+        }
+
         viewModelScope.launch {
             try {
+                ultimoLlamado = ahora
                 _estadoClima.value = _estadoClima.value.copy(huboErrorAlActualizar = false)
 
-                val respuesta = RedClima.api.obtenerClimaActual(latitud, longitud)
-                val nombreCiudad = obtenerNombreCiudad(latitud, longitud)
+                // --- VELOCIDAD x2: EJECUCIÓN EN PARALELO ---
+                // En lugar de esperar uno por uno, lanzamos ambas tareas al mismo tiempo
+                val respuestaDeferred = async { RedClima.api.obtenerClimaActual(latitud, longitud) }
+                val nombreCiudadDeferred = async { obtenerNombreCiudad(latitud, longitud) }
+
+                // Esperamos a que ambas terminen juntas
+                val respuesta = respuestaDeferred.await()
+                val nombreCiudad = nombreCiudadDeferred.await()
 
                 _estadoClima.value = _estadoClima.value.copy(
                     ciudad = nombreCiudad,
@@ -35,7 +56,7 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _estadoClima.value = _estadoClima.value.copy(
                     huboErrorAlActualizar = true,
-                    ciudad = "Oaxaca"
+                    ciudad = "Sin red" // Más claro que poner "Oaxaca" cuando falla el wifi
                 )
             }
         }
@@ -50,10 +71,6 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
                 if (!direcciones.isNullOrEmpty()) {
                     val dir = direcciones[0]
 
-                    // --- NUEVA ESTRATEGIA DE PRIORIDAD ---
-                    // 1. Locality suele ser "Villa de Etla" o "Oaxaca"
-                    // 2. SubAdminArea suele ser el Distrito
-                    // 3. SubLocality es el Barrio (lo dejamos al final)
                     val nombre = dir.locality
                         ?: dir.subAdminArea
                         ?: dir.subLocality
@@ -70,7 +87,6 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Función extra para que el nombre quepa siempre en la tarjeta
     private fun limpiarNombre(nombre: String): String {
         return nombre
             .replace("Municipio de ", "", ignoreCase = true)
@@ -90,8 +106,18 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
             else -> "Clima variable"
         }
     }
+
+    // <--- AHORA SÍ, LA FUNCIÓN ESTÁ DENTRO DE LA CLASE --->
+    fun marcarUbicacionBloqueada() {
+        _estadoClima.value = _estadoClima.value.copy(
+            ciudad = "Ubicación bloqueada",
+            descripcion = "Actívala en ajustes",
+            huboErrorAlActualizar = true
+        )
+    }
 }
 
+// <--- LA DATA CLASS ESTÁ AFUERA, COMO DEBE SER --->
 data class DatosClima(
     val ciudad: String = "Oaxaca",
     val temperatura: Int = 25,
