@@ -7,20 +7,25 @@ import com.example.Tuiteraz.data.network.SupabaseManager
 import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-
+@Serializable
+data class FraseUnidaDto(val texto: String, val autor: String)
 @Serializable
 data class FavoritoDto(
     val user_id: String,
     val frase_id: Int,
-    val texto: String,
-    val autor: String
+    val frases: FraseUnidaDto? = null
 )
-
+@Serializable
+data class InsertarFavoritoDto(
+    val user_id: String,
+    val frase_id: Int
+)
 class FavoritosViewModel : ViewModel() {
     private val _listaFavoritos = MutableStateFlow<List<Frase>>(emptyList())
     val listaFavoritos: StateFlow<List<Frase>> = _listaFavoritos.asStateFlow()
@@ -31,27 +36,27 @@ class FavoritosViewModel : ViewModel() {
                 when (status) {
                     is SessionStatus.Authenticated -> cargarFavoritosDeLaNube()
                     is SessionStatus.NotAuthenticated -> _listaFavoritos.value = emptyList()
-                    else -> {} // Cargando... no hacemos nada
+                    else -> {}
                 }
             }
         }
     }
-
     private fun cargarFavoritosDeLaNube() {
         viewModelScope.launch {
             try {
                 val userId = SupabaseManager.client.auth.currentUserOrNull()?.id ?: return@launch
-
-                // Descargamos las frases de este usuario
                 val respuesta = SupabaseManager.client.postgrest["favoritos"]
-                    .select {
+                    .select(columns = Columns.raw("user_id, frase_id, frases(texto, autor)")) {
                         filter { eq("user_id", userId) }
                     }
                     .decodeList<FavoritoDto>()
 
-                // Actualizamos la memoria de la app
                 _listaFavoritos.value = respuesta.map {
-                    Frase(id = it.frase_id, texto = it.texto, autor = it.autor)
+                    Frase(
+                        id = it.frase_id,
+                        texto = it.frases?.texto ?: "Frase no encontrada",
+                        autor = it.frases?.autor ?: "Desconocido"
+                    )
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -76,15 +81,9 @@ class FavoritosViewModel : ViewModel() {
                     }
                     listaActual.removeAll { it.id == frase.id }
                 } else {
-                    val nuevoFav = FavoritoDto(
-                        user_id = userId,
-                        frase_id = frase.id,
-                        texto = frase.texto,
-                        autor = frase.autor
-                    )
+                    // Usamos el nuevo DTO más ligero
+                    val nuevoFav = InsertarFavoritoDto(user_id = userId, frase_id = frase.id)
                     SupabaseManager.client.postgrest["favoritos"].insert(nuevoFav)
-
-                    // 2. Mostrar en la pantalla
                     listaActual.add(frase)
                 }
                 _listaFavoritos.value = listaActual

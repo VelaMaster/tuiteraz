@@ -1,5 +1,4 @@
 package com.example.Tuiteraz
-
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -42,7 +41,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.shouldShowRationale
@@ -50,33 +48,28 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.android.gms.location.LocationServices
 import com.example.Tuiteraz.ui.componentes.*
 import com.example.Tuiteraz.ui.viewmodel.ClimaViewModel
+import com.example.Tuiteraz.ui.viewmodel.EstadoFraseDia
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalPermissionsApi::class)
 @Composable
 fun PantallaInicio(
-    frase         : Frase,
+    estadoFrase   : EstadoFraseDia,
     paddingValues : PaddingValues = PaddingValues(),
     climaViewModel: ClimaViewModel = viewModel(),
     esFavorita    : Boolean = false,
-    onToggleFavorito: () -> Unit = {}
+    onToggleFavorito: () -> Unit = {},
+
 ) {
     val contexto = LocalContext.current
     val clienteUbicacion = remember { LocationServices.getFusedLocationProviderClient(contexto) }
-
-    // Controlador de permisos de Accompanist
     val permisoUbicacion = rememberPermissionState(permission = Manifest.permission.ACCESS_COARSE_LOCATION)
-
-    // Memoria para el Checkbox de "No volver a preguntar"
     val sharedPrefs = remember { contexto.getSharedPreferences("TuiterazPrefs", Context.MODE_PRIVATE) }
 
-    // Estados para el Diálogo manual
     var mostrarDialogoUbicacion by remember { mutableStateOf(false) }
     var noVolverAMostrarUbicacion by remember { mutableStateOf(false) }
-
     val estadoClima by climaViewModel.estadoClima.collectAsStateWithLifecycle()
 
     var visible by remember { mutableStateOf(false) }
-
     val offsetFrase      = remember { Animatable(0f) }
     val offsetCalendario = remember { Animatable(0f) }
 
@@ -99,7 +92,6 @@ fun PantallaInicio(
     val umbralRefreshPx = remember(density) { with(density) { 110.dp.toPx() } }
     val haptic = LocalHapticFeedback.current
 
-    // FUNCIÓN DE CARGA
     val obtenerUbicacionYClima = { forzar: Boolean ->
         if (ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
@@ -107,7 +99,6 @@ fun PantallaInicio(
                     if (ubicacion != null) {
                         climaViewModel.cargarClima(ubicacion.latitude, ubicacion.longitude, forzar)
                     } else {
-                        // Si el GPS falla, carga el fallback
                         climaViewModel.cargarClima(17.0654, -96.7236, forzar)
                     }
                 }.addOnFailureListener {
@@ -121,29 +112,21 @@ fun PantallaInicio(
         }
     }
 
-    // --- ESCENARIO 1: AL ABRIR LA APP (Maneja el "Solo esta vez") ---
     LaunchedEffect(Unit) {
         visible = true
-        // Siempre intentamos pedir el permiso si no lo tenemos al abrir la app.
-        // Si el usuario eligió "Solo esta vez", Android lanzará el diálogo de nuevo.
-        // Si el usuario eligió "Denegar siempre", Android lo ignorará sin molestar.
         if (!permisoUbicacion.status.isGranted) {
             permisoUbicacion.launchPermissionRequest()
         }
     }
 
-    // --- ESCENARIO 2: REACCIÓN EN VIVO AL PERMISO ---
     LaunchedEffect(permisoUbicacion.status) {
         if (permisoUbicacion.status.isGranted) {
-            // Si el usuario da "Permitir", carga el clima al instante
             obtenerUbicacionYClima(false)
         } else {
-            // Si le da a "Rechazar" o la app abre sin permiso, muestra tarjeta roja
             climaViewModel.marcarUbicacionBloqueada()
         }
     }
 
-    // --- ESCENARIO 3: AL HACER PULL TO REFRESH (JALAR HACIA ABAJO) ---
     val dispararActualizacionClima = {
         if (!refrescandoClima) {
             refrescandoClima = true
@@ -152,12 +135,9 @@ fun PantallaInicio(
                     obtenerUbicacionYClima(true)
                 } else {
                     climaViewModel.marcarUbicacionBloqueada()
-
                     if (permisoUbicacion.status.shouldShowRationale) {
-                        // El sistema aún nos permite lanzar su ventana nativa
                         permisoUbicacion.launchPermissionRequest()
                     } else {
-                        // El sistema nos bloqueó permanentemente. Mostramos nuestro diálogo para ir a Ajustes.
                         val omitirDialogo = sharedPrefs.getBoolean("omitir_dialogo_ubicacion", false)
                         if (!omitirDialogo) {
                             noVolverAMostrarUbicacion = false
@@ -265,7 +245,22 @@ fun PantallaInicio(
                     Box(Modifier.widthIn(max = if (esTablet) 720.dp else 600.dp).fillMaxWidth().padding(horizontal = padH)) {
                         EntradaAnimada(visible, DELAY_SECCION_2) {
                             Box(Modifier.offset { IntOffset(0, offsetFrase.value.roundToInt()) }) {
-                                TarjetaFrase(frase = frase, esTablet = esTablet, esFavorita = esFavorita, onToggleFavorito = onToggleFavorito)
+
+                                // --- AHORA SÍ LEEMOS EL ESTADO CORRECTAMENTE ---
+                                when (estadoFrase) {
+                                    is EstadoFraseDia.CargandoSkeleton -> {
+                                        TarjetaFraseSkeleton(esTablet = esTablet)
+                                    }
+                                    is EstadoFraseDia.MostrarFrase -> {
+                                        TarjetaFrase(
+                                            frase = estadoFrase.frase,
+                                            esTablet = esTablet,
+                                            esFavorita = esFavorita,
+                                            onToggleFavorito = onToggleFavorito
+                                        )
+                                    }
+                                }
+
                             }
                         }
                     }
@@ -286,7 +281,6 @@ fun PantallaInicio(
 
         NotificacionTopMD3(visible = mostrarNotificacion, texto = textoFeriado, topPadding = paddingValues.calculateTopPadding(), onDismiss = { mostrarNotificacion = false })
 
-        // DIÁLOGO CON CHECKBOX DE "NO VOLVER A PREGUNTAR"
         if (mostrarDialogoUbicacion) {
             AlertDialog(
                 onDismissRequest = { mostrarDialogoUbicacion = false },

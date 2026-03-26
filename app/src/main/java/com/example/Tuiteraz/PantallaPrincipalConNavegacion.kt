@@ -22,38 +22,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.Tuiteraz.data.network.SupabaseManager
+import com.example.Tuiteraz.ui.viewmodel.EstadoFraseDia
 import com.example.Tuiteraz.ui.viewmodel.FavoritosViewModel
+import com.example.Tuiteraz.ui.viewmodel.FraseDelDiaViewModel
 import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.launch
 
 private data class DestNav(val etiqueta: String, val iconoOn: ImageVector, val iconoOff: ImageVector)
-
 private val destinos = listOf(
     DestNav("Inicio",    Icons.Filled.Home,     Icons.Outlined.Home),
     DestNav("Favoritos", Icons.Filled.Favorite,  Icons.Outlined.FavoriteBorder),
     DestNav("Ajustes",   Icons.Filled.Settings,  Icons.Outlined.Settings)
 )
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaPrincipalConNavegacion(
-    fraseActual: Frase,
+    fraseViewModel: FraseDelDiaViewModel, // <--- CAMBIO AQUÍ: Recibimos el ViewModel en lugar de la frase estática
     isNotificacionesActivas: Boolean,
     onNotificacionesChange: (Boolean) -> Unit,
     favViewModel: FavoritosViewModel = viewModel()
 ) {
     var itemSeleccionado by remember { mutableIntStateOf(0) }
-    // Estado para saber si estamos dentro de "Acerca de"
     var verAcercaDe by remember { mutableStateOf(false) }
-
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val sessionStatus by SupabaseManager.client.auth.sessionStatus.collectAsStateWithLifecycle()
     val isLogged = sessionStatus is SessionStatus.Authenticated
-
     val listaFavoritos by favViewModel.listaFavoritos.collectAsStateWithLifecycle()
-    val esFavoritaActual = listaFavoritos.any { it.id == fraseActual.id }
+    val estadoFrase by fraseViewModel.estadoUi.collectAsStateWithLifecycle()
+    val esFavoritaActual = if (estadoFrase is EstadoFraseDia.MostrarFrase) {
+        listaFavoritos.any { it.id == (estadoFrase as EstadoFraseDia.MostrarFrase).frase.id }
+    } else false
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(state = rememberTopAppBarState())
 
@@ -61,12 +61,11 @@ fun PantallaPrincipalConNavegacion(
         modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // Ocultamos la barra principal si estamos en "Acerca de", ya que ella tiene su propia flecha de volver
             if (!(itemSeleccionado == 2 && verAcercaDe)) {
                 TopAppBar(
                     title = {
                         Text(
-                            text       = "Tu i teraz",
+                            text       = "Tuiteraz",
                             fontWeight = FontWeight.ExtraBold,
                             style      = MaterialTheme.typography.titleLarge
                         )
@@ -81,7 +80,6 @@ fun PantallaPrincipalConNavegacion(
             }
         },
         bottomBar = {
-            // Ocultamos la barra inferior en "Acerca de" para dar más espacio y enfoque
             if (!(itemSeleccionado == 2 && verAcercaDe)) {
                 NavigationBar {
                     destinos.forEachIndexed { index, destino ->
@@ -96,7 +94,7 @@ fun PantallaPrincipalConNavegacion(
                             selected = seleccionado,
                             onClick  = {
                                 itemSeleccionado = index
-                                verAcercaDe = false // Reseteamos el sub-estado al cambiar de pestaña
+                                verAcercaDe = false
                             },
                             icon = {
                                 Icon(
@@ -112,7 +110,6 @@ fun PantallaPrincipalConNavegacion(
             }
         }
     ) { paddingValues ->
-        // Animación principal entre pestañas (Inicio, Favoritos, Ajustes)
         AnimatedContent(
             targetState = itemSeleccionado,
             transitionSpec = {
@@ -128,18 +125,21 @@ fun PantallaPrincipalConNavegacion(
         ) { pantalla ->
             when (pantalla) {
                 0 -> PantallaInicio(
-                    frase = fraseActual,
+                    estadoFrase = estadoFrase,
                     paddingValues = paddingValues,
                     esFavorita = esFavoritaActual,
                     onToggleFavorito = {
-                        if (isLogged) {
-                            favViewModel.alternarFavorito(fraseActual)
-                        } else {
-                            scope.launch {
-                                snackbarHostState.showSnackbar(
-                                    message = "Inicia sesión en ajustes para poder sincronizar tus favoritas.",
-                                    duration = SnackbarDuration.Short
-                                )
+                        if (estadoFrase is EstadoFraseDia.MostrarFrase) {
+                            val frase = (estadoFrase as EstadoFraseDia.MostrarFrase).frase
+                            if (isLogged) {
+                                favViewModel.alternarFavorito(frase)
+                            } else {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Inicia sesión en ajustes para poder sincronizar tus favoritas.",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
                             }
                         }
                     }
@@ -149,14 +149,13 @@ fun PantallaPrincipalConNavegacion(
                     viewModel = favViewModel
                 )
                 2 -> {
-                    // --- TRANSICIÓN INTERNA DE LA PESTAÑA AJUSTES ---
                     AnimatedContent(
                         targetState = verAcercaDe,
                         transitionSpec = {
-                            if (targetState) { // Entrando a "Acerca de"
+                            if (targetState) {
                                 (slideInHorizontally(spring(Spring.DampingRatioLowBouncy)) { it } + fadeIn())
                                     .togetherWith(slideOutHorizontally(tween(DUR_RAPIDO)) { -it / 3 } + fadeOut())
-                            } else { // Regresando a "Ajustes"
+                            } else {
                                 (slideInHorizontally(spring(Spring.DampingRatioLowBouncy)) { -it / 3 } + fadeIn())
                                     .togetherWith(slideOutHorizontally(tween(DUR_RAPIDO)) { it } + fadeOut())
                             }

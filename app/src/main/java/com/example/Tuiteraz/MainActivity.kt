@@ -14,12 +14,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.example.Tuiteraz.data.network.ProveedorFrases
+import com.example.Tuiteraz.data.local.CacheFrases
+import com.example.Tuiteraz.data.network.ProveedorFrasesRepository
+import com.example.Tuiteraz.data.network.SupabaseManager
 import com.example.Tuiteraz.ui.theme.BalanceTheme
+import com.example.Tuiteraz.ui.viewmodel.FraseDelDiaViewModel
 import com.example.Tuiteraz.worker.NotificacionWorker
 import java.util.concurrent.TimeUnit
 
@@ -30,24 +36,38 @@ class MainActivity : ComponentActivity() {
 
         val sharedPrefs = getSharedPreferences("TuiterazPrefs", Context.MODE_PRIVATE)
 
+        // 1. Preparamos las dependencias de nuestra nueva arquitectura escalable
+        val cacheLocal = CacheFrases(applicationContext)
+        val repositorio = ProveedorFrasesRepository(SupabaseManager.client, cacheLocal)
+
+        // 2. Creamos una "Fábrica" que le enseñe a Compose cómo construir tu ViewModel
+        val viewModelFactory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                if (modelClass.isAssignableFrom(FraseDelDiaViewModel::class.java)) {
+                    return FraseDelDiaViewModel(repositorio) as T
+                }
+                throw IllegalArgumentException("ViewModel desconocido")
+            }
+        }
+
         setContent {
-            // 1. Ahora simplemente leemos el tema del celular en tiempo real
             val sistemaOscuro = isSystemInDarkTheme()
 
             var isNotificacionesActivas by remember {
                 mutableStateOf(sharedPrefs.getBoolean("notifs_activas", false))
             }
 
-            val fraseDelDia = ProveedorFrases.obtenerFraseDelDia()
+            // 3. Instanciamos el ViewModel usando nuestra fábrica
+            val fraseViewModel: FraseDelDiaViewModel = viewModel(factory = viewModelFactory)
 
-            // 2. Le pasamos directamente el tema del celular al BalanceTheme
             BalanceTheme(oscuro = sistemaOscuro) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color    = MaterialTheme.colorScheme.background
                 ) {
                     PantallaPrincipalConNavegacion(
-                        fraseActual = fraseDelDia,
+                        fraseViewModel = fraseViewModel, // <--- Pasamos el ViewModel en lugar de la frase quemada
                         isNotificacionesActivas = isNotificacionesActivas,
                         onNotificacionesChange = { activas ->
                             isNotificacionesActivas = activas

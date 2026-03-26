@@ -1,7 +1,9 @@
 package com.example.Tuiteraz
 
+import kotlinx.serialization.Serializable
+@Serializable
 data class Frase(
-    val id: Int = 0,       // Le ponemos un ID numérico (útil para la base de datos)
-    val texto: String,     // El contenido de la frase
-    val autor: String      // Quién lo dijo
+    val id: Int = 0,
+    val texto: String,
+    val autor: String
 )
