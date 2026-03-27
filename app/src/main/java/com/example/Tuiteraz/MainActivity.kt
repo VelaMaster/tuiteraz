@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
 
         // 1. Preparamos las dependencias de nuestra nueva arquitectura escalable
         val cacheLocal = CacheFrases(applicationContext)
-        val repositorio = ProveedorFrasesRepository(SupabaseManager.client, cacheLocal)
+        val repositorio = ProveedorFrasesRepository(applicationContext, SupabaseManager.client, cacheLocal)
 
         // 2. Creamos una "Fábrica" que le enseñe a Compose cómo construir tu ViewModel
         val viewModelFactory = object : ViewModelProvider.Factory {

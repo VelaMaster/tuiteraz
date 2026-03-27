@@ -1,5 +1,7 @@
 package com.example.Tuiteraz
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -10,10 +12,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -24,6 +31,11 @@ import androidx.compose.ui.unit.sp
 fun PantallaAcercaDe(onBack: () -> Unit) {
     // Manejo del gesto de atrás del sistema
     BackHandler { onBack() }
+
+    // Contexto para lanzar el intent de correo
+    val context = LocalContext.current
+    // Estado para guardar el texto de la sugerencia
+    var sugerenciaTexto by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -147,14 +159,44 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
             Text(
                 "¿Dudas o sugerencias?",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Start)
             )
-            Text(
-                "Contacto: pdiegovela@gmail.com",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(top = 4.dp)
+
+            Spacer(Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = sugerenciaTexto,
+                onValueChange = { sugerenciaTexto = it },
+                label = { Text("Insertar duda o sugerencia") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp),
+                maxLines = 5,
+                shape = RoundedCornerShape(12.dp)
             )
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    if (sugerenciaTexto.isNotBlank()) {
+                        val intent = Intent(Intent.ACTION_SENDTO).apply {
+                            data = Uri.parse("mailto:pdiegovela@gmail.com")
+                            putExtra(Intent.EXTRA_SUBJECT, "Duda o sugerencia - Tuiteraz")
+                            putExtra(Intent.EXTRA_TEXT, sugerenciaTexto)
+                        }
+                        context.startActivity(intent)
+                        sugerenciaTexto = "" // Opcional: limpiar el campo después de enviar
+                    }
+                },
+                modifier = Modifier.align(Alignment.End),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Outlined.Send, contentDescription = "Enviar", modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Enviar")
+            }
 
             Spacer(Modifier.height(40.dp))
         }
