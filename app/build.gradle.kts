@@ -1,19 +1,29 @@
+import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     kotlin("plugin.serialization") version "1.9.22"
 }
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())}
+
 android {
-    namespace   = "com.example.Tuiteraz"
+    namespace   = "com.colectivobarrios.Tuiteraz"
     compileSdk  = 36
 
     defaultConfig {
-        applicationId             = "com.example.Tuiteraz"
+        applicationId             = "com.colectivobarrios.Tuiteraz"
         minSdk                    = 28
         targetSdk                 = 36
         versionCode               = 1
         versionName               = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL")}\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"${localProperties.getProperty("SUPABASE_KEY")}\"")
+        buildConfigField("String", "WEB_CLIENT_ID", "\"${localProperties.getProperty("WEB_CLIENT_ID")}\"")
     }
 
     buildTypes {
@@ -31,7 +41,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    buildFeatures { compose = true }
+    buildFeatures { compose = true
+        buildConfig = true
+    }
     buildToolsVersion = "36.0.0"
 }
 dependencies {

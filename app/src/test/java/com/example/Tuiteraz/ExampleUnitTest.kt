@@ -1,4 +1,4 @@
-package com.example.Tuiteraz
+package com.colectivobarrios.Tuiteraz
 
 import org.junit.Test
 
