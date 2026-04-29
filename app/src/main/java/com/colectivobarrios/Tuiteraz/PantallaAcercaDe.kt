@@ -97,7 +97,7 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Tuiteraz es una herramienta diseñada para ayudarte a ver detalles de tu día y conectar con un pensamiento día a día. El nombre de la aplicación viene del polaco, que significa \"aquí y ahora\". Espero les pueda ayudar y les guste.",
+                    "Tuiteraz es una aplicación enfocada en brindarte un momento de claridad y enfoque en tu día a día. A través de una frase diaria cuidadosamente seleccionada, busca inspirarte a mantener la atención en el presente. Su nombre proviene del polaco \"i teraz\", que significa \"aquí y ahora\", reflejando la esencia de vivir con intención y conciencia cada momento.",
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Justify,
                     lineHeight = 24.sp
@@ -144,60 +144,12 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                 TarjetaPreviewV1(
                     "Exportación HD",
                     "Comparte pensamientos en alta resolución con diseños minimalistas y elegantes.",
-                    Icons.Outlined.Hd,
-                    MaterialTheme.colorScheme.primaryContainer // <- Aquí quitamos el ".copy(alpha = 0.7f)" feo
-                )
-            }
+                        Icons.Outlined.Hd,
+                        MaterialTheme.colorScheme.primaryContainer // <- Aquí quitamos el ".copy(alpha = 0.7f)" feo
+                    )
+                }
 
-            Spacer(Modifier.height(48.dp))
-
-            // --- SECCIÓN DE CONTACTO FINAL ---
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
-            Spacer(Modifier.height(24.dp))
-
-            Text(
-                "¿Dudas o sugerencias?",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = sugerenciaTexto,
-                onValueChange = { sugerenciaTexto = it },
-                label = { Text("Insertar duda o sugerencia") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp),
-                maxLines = 5,
-                shape = RoundedCornerShape(12.dp)
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    if (sugerenciaTexto.isNotBlank()) {
-                        val intent = Intent(Intent.ACTION_SENDTO).apply {
-                            data = Uri.parse("mailto:pdiegovela@gmail.com")
-                            putExtra(Intent.EXTRA_SUBJECT, "Duda o sugerencia - Tuiteraz")
-                            putExtra(Intent.EXTRA_TEXT, sugerenciaTexto)
-                        }
-                        context.startActivity(intent)
-                        sugerenciaTexto = "" // Opcional: limpiar el campo después de enviar
-                    }
-                },
-                modifier = Modifier.align(Alignment.End),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Outlined.Send, contentDescription = "Enviar", modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Enviar")
-            }
-
-            Spacer(Modifier.height(40.dp))
+                Spacer(Modifier.height(48.dp))
         }
     }
 }

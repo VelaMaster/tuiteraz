@@ -50,7 +50,7 @@ class NotificacionWorker(
         val builder = NotificationCompat.Builder(context, canalId)
             // Aquí debes poner el ícono de tu app. Usa uno que exista en tus carpetas drawable/mipmap.
             .setSmallIcon(R.mipmap.ic_launcher_round)
-            .setContentTitle("¡Una nueva frase te espera!")
+            .setContentTitle("¡Un nuevo dia te espera!")
             .setContentText("Entra ahora y descubre tu frase del día.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
