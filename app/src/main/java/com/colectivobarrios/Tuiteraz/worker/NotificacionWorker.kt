@@ -6,11 +6,15 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.colectivobarrios.Tuiteraz.MainActivity
 import com.colectivobarrios.Tuiteraz.R
+import com.colectivobarrios.Tuiteraz.data.local.CacheFrases
+import com.colectivobarrios.Tuiteraz.data.network.ProveedorFrasesRepository
+import com.colectivobarrios.Tuiteraz.data.network.SupabaseManager
 
 class NotificacionWorker(
     private val context: Context,
@@ -18,15 +22,31 @@ class NotificacionWorker(
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        mostrarNotificacion()
-        return Result.success()
-    }
+        return try {
+            val cacheLocal = CacheFrases(context)
+            val repositorio = ProveedorFrasesRepository(context, SupabaseManager.client, cacheLocal)
 
-    private fun mostrarNotificacion() {
+            // 2. Traemos la frase nueva.
+            // IMPORTANTE: Tu repositorio ya guarda en caché y llama a FraseWidget().updateAll(context)
+            val fraseNueva = repositorio.obtenerFraseDelDia()
+
+            // 3. Verificamos si las notificaciones están activas
+            val sharedPrefs = context.getSharedPreferences("TuiterazPrefs", Context.MODE_PRIVATE)
+            val notifsActivas = sharedPrefs.getBoolean("notifs_activas", false)
+
+            if (notifsActivas) {
+                mostrarNotificacion(fraseNueva?.texto ?: "Entra ahora y descubre tu frase del día.")
+            }
+            Result.success()
+        } catch (e: Exception) {
+            Log.e("NotificacionWorker", "Error actualizando en segundo plano", e)
+            Result.retry()
+        }
+    }
+    private fun mostrarNotificacion(textoFrase: String) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val canalId = "frase_diaria_channel"
 
-        // En Android 8+ es obligatorio crear un "Canal de Notificaciones"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val canal = NotificationChannel(
                 canalId,
@@ -38,7 +58,6 @@ class NotificacionWorker(
             notificationManager.createNotificationChannel(canal)
         }
 
-        // Este Intent hace que al tocar la notificación, se abra la app
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -46,17 +65,15 @@ class NotificacionWorker(
             context, 0, intent, PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Construimos el diseño de la notificación
         val builder = NotificationCompat.Builder(context, canalId)
-            // Aquí debes poner el ícono de tu app. Usa uno que exista en tus carpetas drawable/mipmap.
             .setSmallIcon(R.mipmap.ic_launcher_round)
-            .setContentTitle("¡Un nuevo dia te espera!")
-            .setContentText("Entra ahora y descubre tu frase del día.")
+            .setContentTitle("¡Tu nueva frase está lista!")
+            .setContentText(textoFrase)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(textoFrase)) // Para que se pueda expandir y leer completa
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
-            .setAutoCancel(true) // Se borra al tocarla
+            .setAutoCancel(true)
 
-        // Lanzamos la notificación
         notificationManager.notify(1, builder.build())
     }
 }

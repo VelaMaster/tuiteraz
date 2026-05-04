@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "381260655166",
+    "project_id": "tuiteraz-35597",
+    "storage_bucket": "tuiteraz-35597.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381260655166:android:1eacda007eddfcd7af7f6f",
+        "android_client_info": {
+          "package_name": "com.colectivobarrios.Tuiteraz"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCs-ctpT-hyos4xxVrhK9_gx2XXgkCpFhE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

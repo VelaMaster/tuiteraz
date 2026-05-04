@@ -27,20 +27,17 @@ import com.colectivobarrios.Tuiteraz.data.network.SupabaseManager
 import com.colectivobarrios.Tuiteraz.ui.theme.BalanceTheme
 import com.colectivobarrios.Tuiteraz.ui.viewmodel.FraseDelDiaViewModel
 import com.colectivobarrios.Tuiteraz.worker.NotificacionWorker
+import androidx.compose.foundation.layout.safeDrawingPadding
 import java.util.concurrent.TimeUnit
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         val sharedPrefs = getSharedPreferences("TuiterazPrefs", Context.MODE_PRIVATE)
+        programarWorkerDiario(applicationContext)
 
-        // 1. Preparamos las dependencias de nuestra nueva arquitectura escalable
         val cacheLocal = CacheFrases(applicationContext)
         val repositorio = ProveedorFrasesRepository(applicationContext, SupabaseManager.client, cacheLocal)
-
-        // 2. Creamos una "Fábrica" que le enseñe a Compose cómo construir tu ViewModel
         val viewModelFactory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -50,56 +47,42 @@ class MainActivity : ComponentActivity() {
                 throw IllegalArgumentException("ViewModel desconocido")
             }
         }
-
         setContent {
             val sistemaOscuro = isSystemInDarkTheme()
-
             var isNotificacionesActivas by remember {
                 mutableStateOf(sharedPrefs.getBoolean("notifs_activas", false))
             }
-
-            // 3. Instanciamos el ViewModel usando nuestra fábrica
             val fraseViewModel: FraseDelDiaViewModel = viewModel(factory = viewModelFactory)
-
             BalanceTheme(oscuro = sistemaOscuro) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color    = MaterialTheme.colorScheme.background
                 ) {
                     PantallaPrincipalConNavegacion(
-                        fraseViewModel = fraseViewModel, // <--- Pasamos el ViewModel en lugar de la frase quemada
+                        fraseViewModel = fraseViewModel,
                         isNotificacionesActivas = isNotificacionesActivas,
                         onNotificacionesChange = { activas ->
                             isNotificacionesActivas = activas
                             sharedPrefs.edit().putBoolean("notifs_activas", activas).apply()
-                            gestionarNotificaciones(activas)
                         }
                     )
                 }
             }
         }
     }
-
-    private fun gestionarNotificaciones(activar: Boolean) {
-        val workManager = WorkManager.getInstance(applicationContext)
-        val workName = "NotificacionFraseDiaria"
-
-        if (activar) {
-            val constraints = Constraints.Builder()
-                .setRequiresBatteryNotLow(true)
-                .build()
-
-            val request = PeriodicWorkRequestBuilder<NotificacionWorker>(24, TimeUnit.HOURS)
-                .setConstraints(constraints)
-                .build()
-
-            workManager.enqueueUniquePeriodicWork(
-                workName,
-                ExistingPeriodicWorkPolicy.KEEP,
-                request
-            )
-        } else {
-            workManager.cancelUniqueWork(workName)
-        }
+    private fun programarWorkerDiario(context: Context) {
+        val workManager = WorkManager.getInstance(context)
+        val workName = "ActualizacionFraseDiariaWorker"
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
+        val request = PeriodicWorkRequestBuilder<NotificacionWorker>(24, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+        workManager.enqueueUniquePeriodicWork(
+            workName,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 }
