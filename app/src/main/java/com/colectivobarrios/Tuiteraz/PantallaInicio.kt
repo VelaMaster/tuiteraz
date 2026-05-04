@@ -1,4 +1,5 @@
 package com.colectivobarrios.Tuiteraz
+
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -49,6 +50,8 @@ import com.google.android.gms.location.LocationServices
 import com.colectivobarrios.Tuiteraz.ui.componentes.*
 import com.colectivobarrios.Tuiteraz.ui.viewmodel.ClimaViewModel
 import com.colectivobarrios.Tuiteraz.ui.viewmodel.EstadoFraseDia
+import com.colectivobarrios.Tuiteraz.ui.viewmodel.EventosViewModel
+import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -56,9 +59,10 @@ fun PantallaInicio(
     estadoFrase   : EstadoFraseDia,
     paddingValues : PaddingValues = PaddingValues(),
     climaViewModel: ClimaViewModel = viewModel(),
+    eventosViewModel: EventosViewModel = viewModel(),
     esFavorita    : Boolean = false,
     onToggleFavorito: () -> Unit = {},
-
+    onIrAAgenda: () -> Unit = {}
 ) {
     val contexto = LocalContext.current
     val clienteUbicacion = remember { LocationServices.getFusedLocationProviderClient(contexto) }
@@ -69,17 +73,27 @@ fun PantallaInicio(
     var noVolverAMostrarUbicacion by remember { mutableStateOf(false) }
     val estadoClima by climaViewModel.estadoClima.collectAsStateWithLifecycle()
 
+    val todosLosEventos by eventosViewModel.eventos.collectAsStateWithLifecycle()
+
+    val eventosProximos = remember(todosLosEventos) {
+        val hoy = LocalDate.now()
+        todosLosEventos.filter {
+            try { !LocalDate.parse(it.fecha).isBefore(hoy) } catch (e: Exception) { false }
+        }.sortedWith(compareBy({ it.fecha }, { it.hora }))
+    }
+
     var visible by remember { mutableStateOf(false) }
     val offsetFrase      = remember { Animatable(0f) }
     val offsetCalendario = remember { Animatable(0f) }
 
+    // --- ESTADOS SIMPLIFICADOS PARA LA NOTIFICACIÓN ---
     var mostrarNotificacion by remember { mutableStateOf(false) }
-    var textoFeriado        by remember { mutableStateOf("") }
+    var eventoSeleccionado by remember { mutableStateOf<Evento?>(null) } // Guardamos el evento tal cual
 
     LaunchedEffect(mostrarNotificacion) {
-        if (mostrarNotificacion) {
-            delay(5000)
-            mostrarNotificacion = false
+        if (!mostrarNotificacion) {
+            delay(500)
+            eventoSeleccionado = null
         }
     }
 
@@ -96,56 +110,38 @@ fun PantallaInicio(
         if (ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
                 clienteUbicacion.lastLocation.addOnSuccessListener { ubicacion: Location? ->
-                    if (ubicacion != null) {
-                        climaViewModel.cargarClima(ubicacion.latitude, ubicacion.longitude, forzar)
-                    } else {
-                        climaViewModel.cargarClima(17.0654, -96.7236, forzar)
-                    }
-                }.addOnFailureListener {
-                    climaViewModel.cargarClima(17.0654, -96.7236, forzar)
-                }
-            } catch (e: Exception) {
-                climaViewModel.cargarClima(17.0654, -96.7236, forzar)
-            }
-        } else {
-            climaViewModel.marcarUbicacionBloqueada()
-        }
+                    if (ubicacion != null) climaViewModel.cargarClima(ubicacion.latitude, ubicacion.longitude, forzar)
+                    else climaViewModel.cargarClima(17.0654, -96.7236, forzar)
+                }.addOnFailureListener { climaViewModel.cargarClima(17.0654, -96.7236, forzar) }
+            } catch (e: Exception) { climaViewModel.cargarClima(17.0654, -96.7236, forzar) }
+        } else { climaViewModel.marcarUbicacionBloqueada() }
     }
 
     LaunchedEffect(Unit) {
         visible = true
-        if (!permisoUbicacion.status.isGranted) {
-            permisoUbicacion.launchPermissionRequest()
-        }
+        if (!permisoUbicacion.status.isGranted) permisoUbicacion.launchPermissionRequest()
+        eventosViewModel.cargarEventos()
     }
 
     LaunchedEffect(permisoUbicacion.status) {
-        if (permisoUbicacion.status.isGranted) {
-            obtenerUbicacionYClima(false)
-        } else {
-            climaViewModel.marcarUbicacionBloqueada()
-        }
+        if (permisoUbicacion.status.isGranted) obtenerUbicacionYClima(false)
+        else climaViewModel.marcarUbicacionBloqueada()
     }
 
     val dispararActualizacionClima = {
         if (!refrescandoClima) {
             refrescandoClima = true
             scope.launch {
-                if (permisoUbicacion.status.isGranted) {
-                    obtenerUbicacionYClima(true)
-                } else {
+                if (permisoUbicacion.status.isGranted) obtenerUbicacionYClima(true)
+                else {
                     climaViewModel.marcarUbicacionBloqueada()
-                    if (permisoUbicacion.status.shouldShowRationale) {
-                        permisoUbicacion.launchPermissionRequest()
-                    } else {
+                    if (permisoUbicacion.status.shouldShowRationale) permisoUbicacion.launchPermissionRequest()
+                    else {
                         val omitirDialogo = sharedPrefs.getBoolean("omitir_dialogo_ubicacion", false)
-                        if (!omitirDialogo) {
-                            noVolverAMostrarUbicacion = false
-                            mostrarDialogoUbicacion = true
-                        }
+                        if (!omitirDialogo) { noVolverAMostrarUbicacion = false; mostrarDialogoUbicacion = true }
                     }
                 }
-
+                eventosViewModel.cargarEventos()
                 launch {
                     delay(200)
                     offsetFrase.animateTo(30f, spring(Spring.DampingRatioHighBouncy, Spring.StiffnessLow))
@@ -156,7 +152,6 @@ fun PantallaInicio(
                     offsetCalendario.animateTo(44f, spring(Spring.DampingRatioHighBouncy, Spring.StiffnessLow))
                     offsetCalendario.animateTo(0f, SpringMuyRebotante)
                 }
-
                 delay(1500)
                 refrescandoClima = false
             }
@@ -177,8 +172,7 @@ fun PantallaInicio(
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (source == NestedScrollSource.Drag && available.y > 0) {
                     val friccion = (1f - (overscrollPx / maxOverscrollPx)).coerceAtLeast(0.1f)
-                    val nuevoOffset = (overscrollPx + available.y * (0.6f * friccion)).coerceAtMost(maxOverscrollPx)
-                    overscrollPx = nuevoOffset
+                    overscrollPx = (overscrollPx + available.y * (0.6f * friccion)).coerceAtMost(maxOverscrollPx)
                     return Offset(0f, available.y)
                 }
                 return Offset.Zero
@@ -187,7 +181,9 @@ fun PantallaInicio(
                 if (overscrollPx > 0f) {
                     if (overscrollPx > umbralRefreshPx) dispararActualizacionClima()
                     scope.launch {
-                        animate(initialValue = overscrollPx, targetValue = 0f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) { value, _ -> overscrollPx = value }
+                        animate(initialValue = overscrollPx, targetValue = 0f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                        ) { value, _ -> overscrollPx = value }
                     }
                     return Velocity(0f, available.y)
                 }
@@ -211,17 +207,35 @@ fun PantallaInicio(
                     if (metaAlcanzada && !refrescandoClima) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 }
 
-                Box(modifier = Modifier.fillMaxWidth().padding(top = paddingValues.calculateTopPadding() + 8.dp).offset { IntOffset(0, (overscrollPx / 2).roundToInt()) }, contentAlignment = Alignment.TopCenter) {
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(top = paddingValues.calculateTopPadding() + 8.dp)
+                        .offset { IntOffset(0, (overscrollPx / 2).roundToInt()) },
+                    contentAlignment = Alignment.TopCenter
+                ) {
                     val alpha by animateFloatAsState(targetValue = if (overscrollPx > 10f) progreso else 0f, label = "alpha")
-                    val scale by animateFloatAsState(targetValue = if (metaAlcanzada) 1.15f else (progreso * 0.9f), animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f), label = "scale")
-
-                    Box(modifier = Modifier.size(40.dp).graphicsLayer { this.alpha = alpha; this.scaleX = scale; this.scaleY = scale; this.rotationZ = overscrollPx * 2f }.clip(CircleShape).background(if (metaAlcanzada) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = null, tint = if (metaAlcanzada) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    val scale by animateFloatAsState(
+                        targetValue = if (metaAlcanzada) 1.15f else (progreso * 0.9f),
+                        animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f), label = "scale"
+                    )
+                    Box(
+                        modifier = Modifier.size(40.dp)
+                            .graphicsLayer { this.alpha = alpha; this.scaleX = scale; this.scaleY = scale; this.rotationZ = overscrollPx * 2f }
+                            .clip(CircleShape)
+                            .background(if (metaAlcanzada) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null,
+                            tint = if (metaAlcanzada) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
                 Column(
-                    modifier = Modifier.fillMaxSize().offset { IntOffset(0, overscrollPx.roundToInt()) }.onSizeChanged { anchoRaizPx = it.width }.verticalScroll(rememberScrollState()).padding(top = paddingValues.calculateTopPadding() + 8.dp, bottom = paddingValues.calculateBottomPadding() + 16.dp),
+                    modifier = Modifier.fillMaxSize()
+                        .offset { IntOffset(0, overscrollPx.roundToInt()) }
+                        .onSizeChanged { anchoRaizPx = it.width }
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = paddingValues.calculateTopPadding() + 8.dp, bottom = paddingValues.calculateBottomPadding() + 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Spacer(Modifier.height(8.dp))
@@ -245,22 +259,13 @@ fun PantallaInicio(
                     Box(Modifier.widthIn(max = if (esTablet) 720.dp else 600.dp).fillMaxWidth().padding(horizontal = padH)) {
                         EntradaAnimada(visible, DELAY_SECCION_2) {
                             Box(Modifier.offset { IntOffset(0, offsetFrase.value.roundToInt()) }) {
-
-                                // --- AHORA SÍ LEEMOS EL ESTADO CORRECTAMENTE ---
                                 when (estadoFrase) {
-                                    is EstadoFraseDia.CargandoSkeleton -> {
-                                        TarjetaFraseSkeleton(esTablet = esTablet)
-                                    }
-                                    is EstadoFraseDia.MostrarFrase -> {
-                                        TarjetaFrase(
-                                            frase = estadoFrase.frase,
-                                            esTablet = esTablet,
-                                            esFavorita = esFavorita,
-                                            onToggleFavorito = onToggleFavorito
-                                        )
-                                    }
+                                    is EstadoFraseDia.CargandoSkeleton -> TarjetaFraseSkeleton(esTablet = esTablet)
+                                    is EstadoFraseDia.MostrarFrase -> TarjetaFrase(
+                                        frase = estadoFrase.frase, esTablet = esTablet,
+                                        esFavorita = esFavorita, onToggleFavorito = onToggleFavorito
+                                    )
                                 }
-
                             }
                         }
                     }
@@ -270,7 +275,16 @@ fun PantallaInicio(
                     Box(Modifier.widthIn(max = if (esTablet) 720.dp else 600.dp).fillMaxWidth().padding(horizontal = padH)) {
                         EntradaAnimada(visible, DELAY_SECCION_3) {
                             Box(Modifier.offset { IntOffset(0, offsetCalendario.value.roundToInt()) }) {
-                                SeccionCalendarioOpenSource(onFeriadoSeleccionado = { evento -> textoFeriado = evento; mostrarNotificacion = true })
+                                TarjetaProximosEventos(
+                                    esTablet = esTablet,
+                                    eventos = eventosProximos,
+                                    onVerTodoClick = onIrAAgenda,
+                                    onEventoClick = { evento ->
+                                        // AHORA SÍ: Guardamos el evento DIRECTAMENTE. Sin complicaciones de ID.
+                                        eventoSeleccionado = evento
+                                        mostrarNotificacion = true
+                                    }
+                                )
                             }
                         }
                     }
@@ -279,7 +293,38 @@ fun PantallaInicio(
             }
         }
 
-        NotificacionTopMD3(visible = mostrarNotificacion, texto = textoFeriado, topPadding = paddingValues.calculateTopPadding(), onDismiss = { mostrarNotificacion = false })
+        // Recuperamos el evento para asegurarnos de que la UI tenga los datos más frescos
+        val eventoAMostrar = eventoSeleccionado?.let { seleccionado ->
+            if (seleccionado.id != null) {
+                // Si tiene ID (Nube), lo busca actualizado
+                todosLosEventos.find { it.id == seleccionado.id } ?: seleccionado
+            } else {
+                // Si es local, usa el que tenemos guardado en memoria
+                seleccionado
+            }
+        }
+
+        if (eventoAMostrar != null) {
+            NotificacionTopMD3(
+                visible = mostrarNotificacion,
+                evento = eventoAMostrar,
+                topPadding = paddingValues.calculateTopPadding(),
+                onDismiss = { mostrarNotificacion = false },
+                onAlternarAlarma = { eventoActual ->
+                    val nuevoEvento = eventoActual.copy(recordatorio = !eventoActual.recordatorio)
+                    eventosViewModel.actualizarEvento(nuevoEvento, eventoAMostrar)
+                    eventoSeleccionado = nuevoEvento // Reflejo inmediato
+                },
+                onEliminar = { eventoAEliminar ->
+                    eventosViewModel.eliminarEvento(eventoAEliminar)
+                    mostrarNotificacion = false
+                },
+                onActualizar = { eventoEditado ->
+                    eventosViewModel.actualizarEvento(eventoEditado, eventoAMostrar)
+                    eventoSeleccionado = eventoEditado // Actualizamos la memoria para que no se pierda al ser local
+                }
+            )
+        }
 
         if (mostrarDialogoUbicacion) {
             AlertDialog(
@@ -288,18 +333,19 @@ fun PantallaInicio(
                 title = { Text("Ubicación bloqueada") },
                 text = {
                     Column {
-                        Text("Has bloqueado el acceso a la ubicación. Para darte el clima de donde estás, debes prender el permiso manualmente.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Has bloqueado el acceso a la ubicación. Para darte el clima de donde estás, debes prender el permiso manualmente.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth()
                                 .clickable { noVolverAMostrarUbicacion = !noVolverAMostrarUbicacion }
                                 .padding(vertical = 4.dp)
                         ) {
                             Checkbox(checked = noVolverAMostrarUbicacion, onCheckedChange = { noVolverAMostrarUbicacion = it })
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("No volver a preguntar", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                            Text("No volver a preguntar", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 },
@@ -307,8 +353,9 @@ fun PantallaInicio(
                     TextButton(onClick = {
                         if (noVolverAMostrarUbicacion) sharedPrefs.edit().putBoolean("omitir_dialogo_ubicacion", true).apply()
                         mostrarDialogoUbicacion = false
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply { data = Uri.fromParts("package", contexto.packageName, null) }
-                        contexto.startActivity(intent)
+                        contexto.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", contexto.packageName, null)
+                        })
                     }) { Text("Ir a Ajustes") }
                 },
                 dismissButton = {
