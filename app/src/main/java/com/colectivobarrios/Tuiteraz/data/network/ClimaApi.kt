@@ -2,12 +2,13 @@ package com.colectivobarrios.Tuiteraz.data.network
 
 import androidx.annotation.Keep
 import com.google.gson.annotations.SerializedName
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
+import java.util.concurrent.TimeUnit
 
-// 1. Modelos protegidos contra la ofuscación de R8
 @Keep
 data class ClimaResponse(
     @SerializedName("current_weather")
@@ -18,12 +19,10 @@ data class ClimaResponse(
 data class CurrentWeather(
     @SerializedName("temperature")
     val temperature: Double,
-
     @SerializedName("weathercode")
     val weathercode: Int
 )
 
-// 2. La interfaz TAMBIÉN lleva @Keep para que no exploten las Corrutinas (suspend)
 @Keep
 interface OpenMeteoApi {
     @GET("v1/forecast")
@@ -34,11 +33,17 @@ interface OpenMeteoApi {
     ): ClimaResponse
 }
 
-// 3. El objeto para crear la instancia de la API
 object RedClima {
+    // Timeout corto: si no responde en 8s, falla rápido y muestra el caché
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
+        .build()
+
     private val retrofit = Retrofit.Builder()
         .baseUrl("https://api.open-meteo.com/")
         .addConverterFactory(GsonConverterFactory.create())
+        .client(httpClient)
         .build()
 
     val api: OpenMeteoApi = retrofit.create(OpenMeteoApi::class.java)

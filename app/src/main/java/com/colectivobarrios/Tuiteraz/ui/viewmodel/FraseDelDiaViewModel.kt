@@ -19,10 +19,16 @@ class FraseDelDiaViewModel(
     private fun cargarFraseHoy() {
         viewModelScope.launch {
             _estadoUi.value = EstadoFraseDia.CargandoSkeleton
-            val frase = repositorio.obtenerFraseDelDia()
-            if (frase != null) {
-                _estadoUi.value = EstadoFraseDia.MostrarFrase(frase)
-            } else {
+            try {
+                val frase = repositorio.obtenerFraseDelDia()
+                if (frase != null) {
+                    _estadoUi.value = EstadoFraseDia.MostrarFrase(frase)
+                } else {
+                    // Sin internet y sin caché → quedamos en skeleton sin crashear
+                    _estadoUi.value = EstadoFraseDia.CargandoSkeleton
+                }
+            } catch (e: Exception) {
+                // Nunca crashear por falta de red
                 _estadoUi.value = EstadoFraseDia.CargandoSkeleton
             }
         }

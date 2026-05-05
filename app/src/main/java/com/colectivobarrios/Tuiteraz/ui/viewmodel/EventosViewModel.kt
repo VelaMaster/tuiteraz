@@ -1,21 +1,30 @@
 package com.colectivobarrios.Tuiteraz.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.*
 import com.colectivobarrios.Tuiteraz.Evento
+import com.colectivobarrios.Tuiteraz.data.AppDatabase
+import com.colectivobarrios.Tuiteraz.data.EventoEntity
 import com.colectivobarrios.Tuiteraz.data.network.SupabaseManager
+import com.colectivobarrios.Tuiteraz.worker.SyncWorker
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
-class EventosViewModel : ViewModel() {
+// Cambiamos a AndroidViewModel para tener acceso al Contexto para Room y WorkManager
+class EventosViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _eventos = MutableStateFlow<List<Evento>>(emptyList())
-    val eventos: StateFlow<List<Evento>> = _eventos.asStateFlow()
+    private val dao = AppDatabase.getDatabase(application).eventoDao()
+
+    // La UI ahora observa directamente a Room. ¡Sincronización automática!
+    val eventos: StateFlow<List<Evento>> = dao.obtenerTodos()
+        .map { entities -> entities.map { it.toExternalModel() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _fechaSeleccionada = MutableStateFlow(LocalDate.now())
     val fechaSeleccionada: StateFlow<LocalDate> = _fechaSeleccionada.asStateFlow()
@@ -27,189 +36,163 @@ class EventosViewModel : ViewModel() {
     val error: StateFlow<String?> = _error.asStateFlow()
 
     init {
-        cargarEventos()
+        // Al iniciar, intentamos traer lo nuevo de la nube para actualizar Room
+        refrescarDesdeNube()
     }
 
-    fun actualizarFechaSeleccionada(nuevaFecha: LocalDate) {
-        _fechaSeleccionada.value = nuevaFecha
-    }
-
-    fun limpiarError() {
-        _error.value = null
-    }
-
-    fun cargarEventos() {
+    fun refrescarDesdeNube() {
         viewModelScope.launch {
-            _estaCargando.value = true
             try {
                 val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
                 if (usuarioActual != null) {
                     val resultados = SupabaseManager.client.postgrest["eventos"]
                         .select { filter { eq("user_id", usuarioActual.id) } }
                         .decodeList<Evento>()
-                    _eventos.value = resultados
-                } else {
+
+                    resultados.forEach { eventoNube ->
+                        // BUSCAMOS SI YA EXISTE LOCALMENTE
+                        val local = dao.obtenerPorNube(eventoNube.id ?: 0)
+
+                        // REGLA INDESTRUCTIBLE:
+                        // Solo actualizamos si no existe localmente O si lo local ya está sincronizado.
+                        // Si local.sincronizado es FALSE, significa que el usuario editó algo y no queremos pisarlo.
+                        if (local == null || local.sincronizado) {
+                            dao.insertarOActualizar(eventoNube.toEntity(sincronizado = true).copy(
+                                idLocal = local?.idLocal ?: 0 // Mantenemos el ID local para no duplicar
+                            ))
+                        }
+                    }
                 }
             } catch (e: Exception) {
-                _error.value = "Error al cargar: ${e.message}"
-            } finally {
-                _estaCargando.value = false
+                _error.value = "Modo offline activo."
             }
         }
     }
-    // ... (dentro de la clase EventosViewModel)
 
+    fun actualizarEvento(eventoActualizado: Evento, eventoAntiguo: Evento) {
+        viewModelScope.launch {
+            // 1. GUARDADO LOCAL INSTANTÁNEO
+            // Al llevar el idLocal, Room hará el UPDATE en la fila correcta
+            dao.insertarOActualizar(eventoActualizado.toEntity(sincronizado = false))
+
+            // 2. DISPARAR SINCRONIZACIÓN
+            // Si hay internet, se sube ahora. Si no, el Worker esperará solito.
+            programarSincronizacion()
+        }
+    }
+
+    fun agregarEvento(titulo: String, fecha: String, hora: String, recordatorio: Boolean, prioridad: String) {
+        viewModelScope.launch {
+            val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
+            val nuevoEvento = Evento(
+                user_id = usuarioActual?.id ?: "usuario_local_sin_backup",
+                titulo = titulo,
+                fecha = fecha,
+                hora = hora,
+                recordatorio = recordatorio,
+                prioridad = prioridad
+            )
+
+            // Guardamos localmente primero
+            dao.insertarOActualizar(nuevoEvento.toEntity(sincronizado = false))
+
+            // Si hay internet, WorkManager lo subirá
+            programarSincronizacion()
+        }
+    }
+
+    fun cargarEventos() {
+        refrescarDesdeNube()
+    }
     fun eliminarEvento(evento: Evento) {
         viewModelScope.launch {
-            _estaCargando.value = true
             try {
+                // A. Borrado local inmediato (UI se actualiza al instante)
+                if (evento.id != null) {
+                    dao.eliminarPorNube(evento.id)
+                } else {
+                    dao.eliminarLocalmente(evento.titulo, evento.fecha, evento.hora)
+                }
+
+                // B. Borrado en Supabase si hay sesión e ID
                 val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
                 if (usuarioActual != null && evento.id != null) {
                     SupabaseManager.client.postgrest["eventos"].delete {
                         filter { eq("id", evento.id) }
                     }
-                    cargarEventos()
-                } else {
-                    // Borrado local si no hay sesión
-                    _eventos.value = _eventos.value.filter { it != evento }
                 }
             } catch (e: Exception) {
-                _error.value = "Error al eliminar: ${e.message}"
-            } finally {
-                _estaCargando.value = false
+                _error.value = "Eliminado localmente. Sincronización pendiente."
             }
         }
     }
-    // ... dentro de la clase EventosViewModel
-
-    // ACTUALIZADO: Ahora busca por ID si existe, o por los datos antiguos si es un evento local sin ID.
-    fun actualizarEvento(eventoActualizado: Evento, eventoAntiguo: Evento) {
-        viewModelScope.launch {
-            // 1. ACTUALIZACIÓN OPTIMISTA (LOCAL)
-            // Hacemos el cambio en la lista local de inmediato para que la UI se vea perfecta
-            _eventos.value = _eventos.value.map {
-                if (it.id != null && it.id == eventoActualizado.id) {
-                    eventoActualizado // Si tiene ID, comparamos por ID
-                } else if (it.id == null && it == eventoAntiguo) {
-                    eventoActualizado // Si es local (sin ID), comparamos el objeto completo
-                } else {
-                    it
-                }
-            }
-
-            try {
-                val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
-                if (usuarioActual != null && eventoActualizado.id != null) {
-                    // 2. ACTUALIZACIÓN EN LA NUBE
-                    // Aquí le mandamos TODO a Supabase (título, prioridad, hora y recordatorio)
-                    SupabaseManager.client.postgrest["eventos"].update({
-                        Evento::titulo setTo eventoActualizado.titulo
-                        Evento::prioridad setTo eventoActualizado.prioridad
-                        Evento::hora setTo eventoActualizado.hora // ¡Aseguramos la hora!
-                        Evento::recordatorio setTo eventoActualizado.recordatorio // ¡Y el relojito!
-                    }) {
-                        filter { eq("id", eventoActualizado.id) }
-                    }
-
-                    // NOTA: Ya no llamamos a cargarEventos() aquí inmediatamente
-                    // para evitar que datos "viejos" del servidor pisen nuestro cambio local.
-                } else {
-                    // Si no hay sesión, el cambio ya se quedó en la lista local arriba.
-                    _error.value = "Cambio guardado localmente."
-                }
-            } catch (e: Exception) {
-                _error.value = "Error al sincronizar: ${e.message}"
-                // Si falla la nube, re-cargamos para volver a la realidad del servidor (Rollback)
-                cargarEventos()
-            }
-        }
+    fun limpiarError() {
+        _error.value = null
     }
-
-    fun alternarRecordatorio(evento: Evento) {
-        viewModelScope.launch {
-            try {
-                val nuevoEstado = !evento.recordatorio
-                val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
-
-                if (usuarioActual != null && evento.id != null) {
-                    SupabaseManager.client.postgrest["eventos"].update({
-                        Evento::recordatorio setTo nuevoEstado
-                    }) {
-                        filter { eq("id", evento.id) }
-                    }
-                    cargarEventos()
-                } else {
-                    // Actualización local
-                    _eventos.value = _eventos.value.map {
-                        if (it == evento) it.copy(recordatorio = nuevoEstado) else it
-                    }
-                }
-            } catch (e: Exception) {
-                _error.value = "Error al actualizar: ${e.message}"
-            }
-        }
-    }
-// ... dentro de class EventosViewModel : ViewModel()
-
-// ... dentro de class EventosViewModel : ViewModel()
-
     fun migrarEventosLocales() {
         viewModelScope.launch {
             val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
             if (usuarioActual != null) {
-                // 1. Filtramos los eventos que se crearon "offline"
-                val eventosLocales = _eventos.value.filter { it.user_id == "usuario_local_sin_backup" }
+                // Usamos la query correcta del DAO
+                val sinCuenta = dao.obtenerEventosSinCuenta()
 
-                if (eventosLocales.isNotEmpty()) {
-                    try {
-                        // 2. Los subimos uno por uno (o en lote si prefieres) con el ID real
-                        eventosLocales.forEach { local ->
-                            val eventoParaSubir = local.copy(
-                                user_id = usuarioActual.id,
-                                id = null // Dejamos que Supabase genere el ID real
-                            )
-                            SupabaseManager.client.postgrest["eventos"].insert(eventoParaSubir)
-                        }
+                sinCuenta.forEach { entity ->
+                    dao.insertarOActualizar(
+                        entity.copy(
+                            user_id = usuarioActual.id,
+                            sincronizado = false // Pendiente de subir
+                        )
+                    )
+                }
 
-                        // 3. Limpiamos y recargamos todo desde la nube para tener los IDs reales
-                        cargarEventos()
-                        _error.value = "¡Tus eventos locales se han sincronizado con éxito!"
-                    } catch (e: Exception) {
-                        _error.value = "Error al sincronizar: ${e.message}"
-                    }
-                } else {
-                    // Si no había nada local, solo cargamos lo que ya estaba en la nube
-                    cargarEventos()
+                if (sinCuenta.isNotEmpty()) {
+                    Log.d("EventosVM", "Migrando ${sinCuenta.size} evento(s) local(es) a cuenta ${usuarioActual.id}")
+                    programarSincronizacion()
                 }
             }
         }
     }
-    fun agregarEvento(titulo: String, fecha: String, hora: String, recordatorio: Boolean, prioridad: String) {
-        viewModelScope.launch {
-            _estaCargando.value = true
-            try {
-                val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
-                val nuevoEvento = Evento(
-                    user_id = usuarioActual?.id ?: "usuario_local_sin_backup",
-                    titulo = titulo,
-                    fecha = fecha,
-                    hora = hora,
-                    recordatorio = recordatorio,
-                    prioridad = prioridad
-                )
-
-                if (usuarioActual != null) {
-                    SupabaseManager.client.postgrest["eventos"].insert(nuevoEvento)
-                    cargarEventos()
-                } else {
-                    _eventos.value = _eventos.value + nuevoEvento
-                    _error.value = "Guardado inicie sesión para tener respaldo."
-                }
-            } catch (e: Exception) {
-                _error.value = "Error: ${e.message}"
-            } finally {
-                _estaCargando.value = false
-            }
-        }
+    fun actualizarFechaSeleccionada(nuevaFecha: LocalDate) {
+        _fechaSeleccionada.value = nuevaFecha
     }
+
+    private fun programarSincronizacion() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, WorkRequest.MIN_BACKOFF_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            .build()
+
+        WorkManager.getInstance(getApplication()).enqueueUniqueWork(
+            "sync_eventos_supabase",
+            ExistingWorkPolicy.REPLACE, // Reemplaza tareas pendientes para no saturar
+            syncRequest
+        )
+    }
+
+    // Funciones de extensión para convertir entre modelos (mapeo)
+    private fun EventoEntity.toExternalModel() = Evento(
+        idLocal = idLocal, // <-- MAPEAMOS EL ID LOCAL
+        id = idNube,
+        user_id = user_id,
+        titulo = titulo,
+        fecha = fecha,
+        hora = hora,
+        recordatorio = recordatorio,
+        prioridad = prioridad
+    )
+    private fun Evento.toEntity(sincronizado: Boolean) = EventoEntity(
+        idLocal = idLocal,
+        idNube = id,
+        user_id = user_id,
+        titulo = titulo,
+        fecha = fecha,
+        hora = hora,
+        recordatorio = recordatorio,
+        prioridad = prioridad,
+        sincronizado = sincronizado
+    )
 }

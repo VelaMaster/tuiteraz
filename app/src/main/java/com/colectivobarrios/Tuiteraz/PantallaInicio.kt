@@ -243,12 +243,13 @@ fun PantallaInicio(
                     Box(Modifier.widthIn(max = if (esTablet) 720.dp else 600.dp).fillMaxWidth().padding(horizontal = padH)) {
                         EntradaAnimada(visible, DELAY_SECCION_1) {
                             TarjetaClimaDinamica(
-                                estaCargando = refrescandoClima,
+                                estaCargando = refrescandoClima || estadoClima.actualizando,
                                 esTablet     = esTablet,
                                 ciudad       = estadoClima.ciudad,
                                 temperatura  = estadoClima.temperatura,
                                 descripcion  = estadoClima.descripcion,
                                 huboError    = estadoClima.huboErrorAlActualizar,
+                                desdCache    = estadoClima.desdCache,   // <-- nuevo
                                 onTap        = { dispararActualizacionClima() }
                             )
                         }
@@ -311,9 +312,12 @@ fun PantallaInicio(
                 topPadding = paddingValues.calculateTopPadding(),
                 onDismiss = { mostrarNotificacion = false },
                 onAlternarAlarma = { eventoActual ->
-                    val nuevoEvento = eventoActual.copy(recordatorio = !eventoActual.recordatorio)
-                    eventosViewModel.actualizarEvento(nuevoEvento, eventoAMostrar)
-                    eventoSeleccionado = nuevoEvento // Reflejo inmediato
+                    val nuevoEvento = eventoActual.copy(
+                        recordatorio = !eventoActual.recordatorio,
+                        idLocal = eventoActual.idLocal
+                    )
+                    eventosViewModel.actualizarEvento(nuevoEvento, eventoActual)
+                    eventoSeleccionado = nuevoEvento
                 },
                 onEliminar = { eventoAEliminar ->
                     eventosViewModel.eliminarEvento(eventoAEliminar)

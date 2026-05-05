@@ -24,6 +24,7 @@ import com.colectivobarrios.Tuiteraz.* @OptIn(ExperimentalAnimationApi::class, E
 @Composable
 fun TarjetaClimaDinamica(
     estaCargando : Boolean,
+    desdCache: Boolean = false,
     esTablet     : Boolean = false,
     ciudad       : String,
     temperatura  : Int,
@@ -146,12 +147,11 @@ fun TarjetaClimaDinamica(
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
-                                if (huboError) {
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                if (desdCache && !huboError) {
                                     Text(
-                                        "(Sin red)",
+                                        text = "Última actualización guardada",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.error
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                     )
                                 }
                             }
