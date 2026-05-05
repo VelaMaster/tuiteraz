@@ -107,23 +107,36 @@ fun PantallaInicio(
     val haptic = LocalHapticFeedback.current
 
     val obtenerUbicacionYClima = { forzar: Boolean ->
+        android.util.Log.d("TUITERAZ_DEBUG", "obtenerUbicacionYClima() llamado, forzar=$forzar")
         if (ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
                 clienteUbicacion.lastLocation.addOnSuccessListener { ubicacion: Location? ->
+                    android.util.Log.d("TUITERAZ_DEBUG", "lastLocation success: ubicacion=${ubicacion != null}")
                     if (ubicacion != null) climaViewModel.cargarClima(ubicacion.latitude, ubicacion.longitude, forzar)
                     else climaViewModel.cargarClima(17.0654, -96.7236, forzar)
-                }.addOnFailureListener { climaViewModel.cargarClima(17.0654, -96.7236, forzar) }
-            } catch (e: Exception) { climaViewModel.cargarClima(17.0654, -96.7236, forzar) }
-        } else { climaViewModel.marcarUbicacionBloqueada() }
+                }.addOnFailureListener { e ->
+                    android.util.Log.w("TUITERAZ_DEBUG", "lastLocation failure: ${e.message}", e)
+                    climaViewModel.cargarClima(17.0654, -96.7236, forzar)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TUITERAZ_DEBUG", "Excepción en lastLocation: ${e.message}", e)
+                climaViewModel.cargarClima(17.0654, -96.7236, forzar)
+            }
+        } else {
+            android.util.Log.d("TUITERAZ_DEBUG", "Sin permiso de ubicación, marcando bloqueada")
+            climaViewModel.marcarUbicacionBloqueada()
+        }
     }
 
     LaunchedEffect(Unit) {
+        android.util.Log.d("TUITERAZ_DEBUG", "PantallaInicio LaunchedEffect(Unit) - solicitando permiso si falta")
         visible = true
         if (!permisoUbicacion.status.isGranted) permisoUbicacion.launchPermissionRequest()
         eventosViewModel.cargarEventos()
     }
 
     LaunchedEffect(permisoUbicacion.status) {
+        android.util.Log.d("TUITERAZ_DEBUG", "PantallaInicio LaunchedEffect(permiso) - granted=${permisoUbicacion.status.isGranted}")
         if (permisoUbicacion.status.isGranted) obtenerUbicacionYClima(false)
         else climaViewModel.marcarUbicacionBloqueada()
     }

@@ -34,6 +34,7 @@ import com.colectivobarrios.Tuiteraz.ui.viewmodel.FavoritosViewModel
 import com.colectivobarrios.Tuiteraz.ui.viewmodel.FraseDelDiaViewModel
 import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 private data class DestNav(val etiqueta: String, val iconoOn: ImageVector, val iconoOff: ImageVector)
@@ -61,9 +62,20 @@ fun PantallaPrincipalConNavegacion(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val sessionStatus by SupabaseManager.client.auth.sessionStatus.collectAsStateWithLifecycle()
+    // Envolvemos sessionStatus con .catch para que un fallo de red al refrescar
+    // el token (sin internet → DNS error) no llegue al hilo main como crash.
+    val sessionStatusFlow = remember {
+        SupabaseManager.client.auth.sessionStatus
+            .catch { e ->
+                android.util.Log.w("TUITERAZ_DEBUG", "sessionStatus flow excepción atrapada: ${e.message}", e)
+            }
+    }
+    val sessionStatus by sessionStatusFlow.collectAsStateWithLifecycle(
+        initialValue = SupabaseManager.client.auth.sessionStatus.value
+    )
     val isLogged = sessionStatus is SessionStatus.Authenticated
     LaunchedEffect(isLogged) {
+        android.util.Log.d("TUITERAZ_DEBUG", "Nav LaunchedEffect(isLogged=$isLogged) sessionStatus=${sessionStatus::class.simpleName}")
         if (isLogged) {
             eventosViewModel.migrarEventosLocales()
         }

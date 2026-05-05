@@ -2,6 +2,7 @@ package com.colectivobarrios.Tuiteraz.ui.viewmodel
 
 import android.app.Application
 import android.location.Geocoder
+import android.util.Log
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -12,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import com.colectivobarrios.Tuiteraz.data.network.RedClima
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -81,9 +83,13 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cargarClima(latitud: Double, longitud: Double, forzar: Boolean = false) {
+        Log.d("TUITERAZ_DEBUG", "ClimaVM.cargarClima(lat=$latitud, lon=$longitud, forzar=$forzar)")
         val ahora = System.currentTimeMillis()
 
-        if (!forzar && ahora - ultimoLlamado < TIEMPO_ESPERA_MS) return
+        if (!forzar && ahora - ultimoLlamado < TIEMPO_ESPERA_MS) {
+            Log.d("TUITERAZ_DEBUG", "ClimaVM.cargarClima: throttle, omitiendo llamada")
+            return
+        }
 
         viewModelScope.launch {
             try {
@@ -98,11 +104,18 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                val respuestaDeferred   = async { RedClima.api.obtenerClimaActual(latitud, longitud) }
-                val nombreCiudadDeferred = async { obtenerNombreCiudad(latitud, longitud) }
-
-                val respuesta    = respuestaDeferred.await()
-                val nombreCiudad = nombreCiudadDeferred.await()
+                Log.d("TUITERAZ_DEBUG", "ClimaVM.cargarClima: lanzando llamadas async (Retrofit + Geocoder)")
+                // ── coroutineScope encapsula la propagación de excepciones de los async hijos.
+                // Sin esto, si un async falla, la excepción se propaga DOS veces:
+                //   1. Por await() → atrapada por nuestro try/catch (OK)
+                //   2. Por structured concurrency → cancela el launch padre y crashea al main
+                // coroutineScope hace que ambas vías converjan en una sola excepción atrapable.
+                val (respuesta, nombreCiudad) = coroutineScope {
+                    val respuestaDeferred    = async { RedClima.api.obtenerClimaActual(latitud, longitud) }
+                    val nombreCiudadDeferred = async { obtenerNombreCiudad(latitud, longitud) }
+                    Pair(respuestaDeferred.await(), nombreCiudadDeferred.await())
+                }
+                Log.d("TUITERAZ_DEBUG", "ClimaVM.cargarClima: respuesta Retrofit + Geocoder OK")
                 val descripcion  = interpretarCodigoClima(respuesta.current_weather.weathercode)
                 val temperatura  = respuesta.current_weather.temperature.toInt()
 
@@ -117,8 +130,10 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
                     desdCache             = false,
                     actualizando          = false
                 )
+                Log.d("TUITERAZ_DEBUG", "ClimaVM.cargarClima: estado actualizado con éxito")
 
             } catch (e: Exception) {
+                Log.w("TUITERAZ_DEBUG", "ClimaVM.cargarClima: excepción atrapada (${e.javaClass.simpleName}): ${e.message}", e)
                 // Sin internet o timeout: mostramos el caché con indicador de error
                 // NO crasheamos — solo actualizamos la bandera
                 _estadoClima.value = _estadoClima.value.copy(
@@ -133,8 +148,10 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun obtenerNombreCiudad(lat: Double, lon: Double): String {
         return withContext(Dispatchers.IO) {
             try {
+                Log.d("TUITERAZ_DEBUG", "Geocoder.getFromLocation($lat, $lon) iniciando")
                 val geocoder   = Geocoder(getApplication(), Locale.getDefault())
                 val direcciones = geocoder.getFromLocation(lat, lon, 1)
+                Log.d("TUITERAZ_DEBUG", "Geocoder devolvió ${direcciones?.size ?: 0} direcciones")
                 if (!direcciones.isNullOrEmpty()) {
                     val dir = direcciones[0]
                     val nombre = dir.locality
@@ -145,6 +162,7 @@ class ClimaViewModel(application: Application) : AndroidViewModel(application) {
                     limpiarNombre(nombre)
                 } else "Ubicación actual"
             } catch (e: Exception) {
+                Log.w("TUITERAZ_DEBUG", "Geocoder excepción (${e.javaClass.simpleName}): ${e.message}", e)
                 // Geocoder también puede fallar sin internet
                 _estadoClima.value.ciudad.takeIf { it != "Cargando..." } ?: "Ubicación actual"
             }

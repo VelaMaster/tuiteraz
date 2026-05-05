@@ -17,10 +17,12 @@ class FraseDelDiaViewModel(
         cargarFraseHoy()
     }
     private fun cargarFraseHoy() {
+        android.util.Log.d("TUITERAZ_DEBUG", "FraseVM.cargarFraseHoy() empezando")
         viewModelScope.launch {
             _estadoUi.value = EstadoFraseDia.CargandoSkeleton
             try {
                 val frase = repositorio.obtenerFraseDelDia()
+                android.util.Log.d("TUITERAZ_DEBUG", "FraseVM.cargarFraseHoy obtenida=${frase != null}")
                 if (frase != null) {
                     _estadoUi.value = EstadoFraseDia.MostrarFrase(frase)
                 } else {
@@ -28,6 +30,7 @@ class FraseDelDiaViewModel(
                     _estadoUi.value = EstadoFraseDia.CargandoSkeleton
                 }
             } catch (e: Exception) {
+                android.util.Log.w("TUITERAZ_DEBUG", "FraseVM.cargarFraseHoy excepción atrapada (${e.javaClass.simpleName}): ${e.message}", e)
                 // Nunca crashear por falta de red
                 _estadoUi.value = EstadoFraseDia.CargandoSkeleton
             }

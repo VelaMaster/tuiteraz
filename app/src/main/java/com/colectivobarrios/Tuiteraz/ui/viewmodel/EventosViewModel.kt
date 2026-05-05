@@ -41,13 +41,16 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun refrescarDesdeNube() {
+        Log.d("TUITERAZ_DEBUG", "EventosVM.refrescarDesdeNube() llamado")
         viewModelScope.launch {
             try {
                 val usuarioActual = SupabaseManager.client.auth.currentUserOrNull()
+                Log.d("TUITERAZ_DEBUG", "EventosVM.refrescarDesdeNube usuario=${usuarioActual?.id ?: "null"}")
                 if (usuarioActual != null) {
                     val resultados = SupabaseManager.client.postgrest["eventos"]
                         .select { filter { eq("user_id", usuarioActual.id) } }
                         .decodeList<Evento>()
+                    Log.d("TUITERAZ_DEBUG", "EventosVM.refrescarDesdeNube ${resultados.size} eventos de la nube")
 
                     resultados.forEach { eventoNube ->
                         // BUSCAMOS SI YA EXISTE LOCALMENTE
@@ -64,6 +67,7 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
             } catch (e: Exception) {
+                Log.w("TUITERAZ_DEBUG", "EventosVM.refrescarDesdeNube excepción atrapada (${e.javaClass.simpleName}): ${e.message}", e)
                 _error.value = "Modo offline activo."
             }
         }

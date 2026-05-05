@@ -2,6 +2,7 @@ package com.colectivobarrios.Tuiteraz
 
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -31,10 +32,35 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import java.util.concurrent.TimeUnit
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // ── CAZADOR DE EXCEPCIONES GLOBALES ──────────────────────────
+        // Atrapa CUALQUIER crash no manejado y vuelca el stack trace completo a Logcat
+        // antes de que el sistema mate al proceso. Filtra en logcat por tag "TUITERAZ_CRASH"
+        val handlerSistema = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { hilo, error ->
+            Log.e("TUITERAZ_CRASH", "═══════════════════════════════════════════════════════════")
+            Log.e("TUITERAZ_CRASH", "CRASH en hilo: ${hilo.name}")
+            Log.e("TUITERAZ_CRASH", "Tipo de excepción: ${error.javaClass.name}")
+            Log.e("TUITERAZ_CRASH", "Mensaje: ${error.message}")
+            Log.e("TUITERAZ_CRASH", "Stack trace completo:", error)
+            // Imprimimos también la cadena de causes (excepciones envueltas)
+            var causa: Throwable? = error.cause
+            var nivel = 1
+            while (causa != null) {
+                Log.e("TUITERAZ_CRASH", "── Causa nivel $nivel: ${causa.javaClass.name}: ${causa.message}", causa)
+                causa = causa.cause
+                nivel++
+            }
+            Log.e("TUITERAZ_CRASH", "═══════════════════════════════════════════════════════════")
+            // Le pasamos el control al sistema para que muestre el diálogo y mate el proceso
+            handlerSistema?.uncaughtException(hilo, error)
+        }
+
+        Log.d("TUITERAZ_DEBUG", "MainActivity.onCreate() empezando")
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val sharedPrefs = getSharedPreferences("TuiterazPrefs", Context.MODE_PRIVATE)
         programarWorkerDiario(applicationContext)
+        Log.d("TUITERAZ_DEBUG", "MainActivity.onCreate() worker programado")
 
         val cacheLocal = CacheFrases(applicationContext)
         val repositorio = ProveedorFrasesRepository(applicationContext, SupabaseManager.client, cacheLocal)
