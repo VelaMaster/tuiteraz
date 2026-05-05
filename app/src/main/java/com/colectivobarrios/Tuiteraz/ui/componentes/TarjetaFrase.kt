@@ -107,6 +107,11 @@ fun TarjetaFrase(
             )
             Text(
                 frase.texto,
+                // fillMaxWidth + TextAlign.Center centra cada línea dentro del ancho
+                // del Column. Sin fillMaxWidth, Compose le da al Text su ancho
+                // intrínseco (ancho de la línea más larga) y eso puede quedar
+                // descentrado respecto al resto del Column cuando la frase wrappea.
+                modifier   = Modifier.fillMaxWidth(),
                 style      = if (esTablet) MaterialTheme.typography.headlineSmall
                 else          MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Medium,
@@ -126,6 +131,14 @@ fun TarjetaFrase(
             Spacer(Modifier.height(if (esTablet) 18.dp else 14.dp))
             Text(
                 frase.autor.uppercase(),
+                // fillMaxWidth + TextAlign.Center es CRÍTICO aquí: el letterSpacing
+                // de 2.sp agrega espacio extra después de cada letra (incluida la
+                // última), inflando el ancho intrínseco del Text a la derecha. Si
+                // dejamos que el Column lo centre por su ancho intrínseco, el texto
+                // se ve corrido visualmente a la izquierda (desalineación óptica
+                // por trailing letter-spacing).
+                modifier      = Modifier.fillMaxWidth(),
+                textAlign     = TextAlign.Center,
                 style         = MaterialTheme.typography.labelLarge,
                 fontWeight    = FontWeight.Bold,
                 color         = Color(colorPrimario),

@@ -18,18 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.colectivobarrios.Tuiteraz.data.local.CacheFrases
 import com.colectivobarrios.Tuiteraz.data.network.ProveedorFrasesRepository
 import com.colectivobarrios.Tuiteraz.data.network.SupabaseManager
 import com.colectivobarrios.Tuiteraz.ui.theme.BalanceTheme
 import com.colectivobarrios.Tuiteraz.ui.viewmodel.FraseDelDiaViewModel
-import com.colectivobarrios.Tuiteraz.worker.NotificacionWorker
+import com.colectivobarrios.Tuiteraz.worker.ActualizadorWidgetWorker
 import androidx.compose.foundation.layout.safeDrawingPadding
-import java.util.concurrent.TimeUnit
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         // ── CAZADOR DE EXCEPCIONES GLOBALES ──────────────────────────
@@ -59,8 +54,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val sharedPrefs = getSharedPreferences("TuiterazPrefs", Context.MODE_PRIVATE)
-        programarWorkerDiario(applicationContext)
-        Log.d("TUITERAZ_DEBUG", "MainActivity.onCreate() worker programado")
+
+        // Programa el worker que actualiza el widget a las 4 AM hora local del usuario.
+        // KEEP en vez de REPLACE: si ya hay uno programado lo respeta, así no perdemos
+        // la próxima ejecución programada solo por reabrir la app.
+        ActualizadorWidgetWorker.programarParaProxima4AM(applicationContext, reemplazar = false)
+        Log.d("TUITERAZ_DEBUG", "MainActivity.onCreate() ActualizadorWidgetWorker programado")
 
         val cacheLocal = CacheFrases(applicationContext)
         val repositorio = ProveedorFrasesRepository(applicationContext, SupabaseManager.client, cacheLocal)
@@ -95,20 +94,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-    private fun programarWorkerDiario(context: Context) {
-        val workManager = WorkManager.getInstance(context)
-        val workName = "ActualizacionFraseDiariaWorker"
-        val constraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(true)
-            .build()
-        val request = PeriodicWorkRequestBuilder<NotificacionWorker>(24, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .build()
-        workManager.enqueueUniquePeriodicWork(
-            workName,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
     }
 }

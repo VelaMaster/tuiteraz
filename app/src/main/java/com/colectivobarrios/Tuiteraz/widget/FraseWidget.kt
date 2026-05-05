@@ -121,7 +121,7 @@ class FraseWidget : GlanceAppWidget() {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "\u201C",
+                                    text = "“",
                                     style = TextStyle(
                                         fontSize = 20.sp,
                                         fontWeight = FontWeight.Bold,
