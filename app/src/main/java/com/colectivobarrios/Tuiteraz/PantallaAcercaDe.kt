@@ -80,7 +80,7 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                 fontWeight = FontWeight.ExtraBold
             )
             Text(
-                "Versión 1.0 - México",
+                "Versión 2.0 - México",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
@@ -111,12 +111,12 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    "Lo nuevo en la v1.0",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                TarjetaPreviewV1(
+                    "Eventos",
+                    "Crea, organiza y recibe recordatorios de tus eventos importantes directamente en la app.",
+                    Icons.Outlined.CalendarMonth,
+                    MaterialTheme.colorScheme.tertiaryContainer
                 )
-
                 TarjetaPreviewV1(
                     "Frase Diaria",
                     "Recibe una sola frase poderosa cada 24 horas para mantener el enfoque.",
@@ -147,6 +147,12 @@ fun PantallaAcercaDe(onBack: () -> Unit) {
                         Icons.Outlined.Hd,
                         MaterialTheme.colorScheme.primaryContainer // <- Aquí quitamos el ".copy(alpha = 0.7f)" feo
                     )
+                TarjetaPreviewV1(
+                    "Corrección de errores",
+                    "Se solucionaron errores menores y se mejoró la estabilidad general de la aplicación.",
+                    Icons.Outlined.BugReport,
+                    MaterialTheme.colorScheme.surfaceVariant
+                )
                 }
 
                 Spacer(Modifier.height(48.dp))

@@ -2,11 +2,13 @@ package com.colectivobarrios.Tuiteraz.ui.componentes
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +61,38 @@ fun TarjetaClimaDinamica(
         label         = "elev"
     )
 
+    // Detección de día/noche basada en la hora local del dispositivo.
+    // Noche = de 19:00 a 06:00. Se evalúa una sola vez por composición; si el
+    // usuario deja la app abierta cruzando la medianoche el icono no cambia
+    // hasta el siguiente render — es aceptable porque rara vez ocurre.
+    val esDeNoche = remember {
+        val ahora = java.time.LocalTime.now()
+        ahora.isAfter(java.time.LocalTime.of(19, 0)) ||
+            ahora.isBefore(java.time.LocalTime.of(6, 0))
+    }
+
+    // Gradient de fondo del widget — sutil pero da profundidad y carácter al
+    // diseño. Cambia según día/noche para reforzar el contexto visual.
+    val tertiaryContainer = MaterialTheme.colorScheme.tertiaryContainer
+    val primaryContainer  = MaterialTheme.colorScheme.primaryContainer
+    val brushFondo = if (esDeNoche) {
+        // Noche: gradient diagonal de tertiary a primary (más violeta/azulado)
+        Brush.linearGradient(
+            colors = listOf(
+                tertiaryContainer.copy(alpha = 0.95f),
+                primaryContainer.copy(alpha = 0.85f)
+            )
+        )
+    } else {
+        // Día: gradient horizontal del mismo tertiary, claro a oscuro sutil
+        Brush.horizontalGradient(
+            colors = listOf(
+                tertiaryContainer.copy(alpha = 1f),
+                tertiaryContainer.copy(alpha = 0.80f)
+            )
+        )
+    }
+
     Box(
         modifier         = Modifier
             .fillMaxWidth()
@@ -88,6 +122,9 @@ fun TarjetaClimaDinamica(
             ),
             elevation = CardDefaults.elevatedCardElevation(defaultElevation = elevacion)
         ) {
+            // Capa con el gradient encima del container — da profundidad sin
+            // perder la elevation/sombra del Card.
+            Box(modifier = Modifier.fillMaxSize().background(brushFondo)) {
             AnimatedContent(
                 targetState  = estaCargando,
                 transitionSpec = {
@@ -157,6 +194,16 @@ fun TarjetaClimaDinamica(
                             }
                         }
 
+                        // Icono moderno del clima. Si es de noche se muestra una
+                        // luna en lugar del sol. La detección se hace arriba (esDeNoche)
+                        // con la hora local del dispositivo.
+                        IconoClima(
+                            descripcion = descripcion,
+                            tamano = if (esTablet) 72.dp else 56.dp,
+                            esDeNoche = esDeNoche,
+                            modifier = Modifier.padding(end = if (esTablet) 16.dp else 10.dp)
+                        )
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = temperatura.toString(),
@@ -175,6 +222,7 @@ fun TarjetaClimaDinamica(
                     }
                 }
             }
+            }  // ← cierra Box(gradient)
         }
     }
 }

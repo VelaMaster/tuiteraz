@@ -21,8 +21,8 @@ android {
         applicationId             = "com.colectivobarrios.Tuiteraz"
         minSdk                    = 28
         targetSdk                 = 36
-        versionCode               = 3
-        versionName               = "1.1.1"
+        versionCode               = 5
+        versionName               = "2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL")}\"")

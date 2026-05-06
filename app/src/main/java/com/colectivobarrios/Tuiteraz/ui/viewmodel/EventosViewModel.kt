@@ -9,6 +9,7 @@ import com.colectivobarrios.Tuiteraz.Evento
 import com.colectivobarrios.Tuiteraz.data.AppDatabase
 import com.colectivobarrios.Tuiteraz.data.EventoEntity
 import com.colectivobarrios.Tuiteraz.data.network.SupabaseManager
+import com.colectivobarrios.Tuiteraz.notificaciones.EventoAlarmManager
 import com.colectivobarrios.Tuiteraz.worker.SyncWorker
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -34,6 +35,15 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    /**
+     * Cuando un evento se programa pero falta un permiso crítico de notificaciones,
+     * el ViewModel emite aquí el tipo de problema para que la UI muestre un diálogo
+     * con CTA para abrir los ajustes correctos.
+     */
+    private val _problemaPermiso = MutableStateFlow<EventoAlarmManager.ResultadoProgramacion?>(null)
+    val problemaPermiso: StateFlow<EventoAlarmManager.ResultadoProgramacion?> = _problemaPermiso.asStateFlow()
+    fun limpiarProblemaPermiso() { _problemaPermiso.value = null }
 
     init {
         // Al iniciar, intentamos traer lo nuevo de la nube para actualizar Room
@@ -77,9 +87,20 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             // 1. GUARDADO LOCAL INSTANTÁNEO
             // Al llevar el idLocal, Room hará el UPDATE en la fila correcta
-            dao.insertarOActualizar(eventoActualizado.toEntity(sincronizado = false))
+            val idLocal = dao.insertarOActualizar(eventoActualizado.toEntity(sincronizado = false))
 
-            // 2. DISPARAR SINCRONIZACIÓN
+            // 2. REPROGRAMAR LA NOTIFICACIÓN
+            // Cancelamos por idLocal anterior (puede ser el mismo si fue UPDATE) y
+            // reprogramamos con los datos nuevos. EventoAlarmManager.programar() ya
+            // maneja el caso recordatorio=false (cancela cualquier alarma pendiente).
+            val idEfectivo = if (idLocal > 0L) idLocal else eventoActualizado.idLocal
+            val resultado = EventoAlarmManager.programar(
+                getApplication(),
+                eventoActualizado.copy(idLocal = idEfectivo)
+            )
+            evaluarResultadoProgramacion(eventoActualizado.recordatorio, resultado)
+
+            // 3. DISPARAR SINCRONIZACIÓN
             // Si hay internet, se sube ahora. Si no, el Worker esperará solito.
             programarSincronizacion()
         }
@@ -97,8 +118,17 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
                 prioridad = prioridad
             )
 
-            // Guardamos localmente primero
-            dao.insertarOActualizar(nuevoEvento.toEntity(sincronizado = false))
+            // Guardamos localmente — el dao devuelve el idLocal autogenerado
+            // que necesitamos para programar la alarma con un requestCode estable
+            val idLocal = dao.insertarOActualizar(nuevoEvento.toEntity(sincronizado = false))
+
+            // Programamos la notificación si recordatorio=true
+            // (el AlarmManager decide tipo según prioridad: Alta = full-screen)
+            val resultado = EventoAlarmManager.programar(
+                getApplication(),
+                nuevoEvento.copy(idLocal = idLocal)
+            )
+            evaluarResultadoProgramacion(recordatorio, resultado)
 
             // Si hay internet, WorkManager lo subirá
             programarSincronizacion()
@@ -110,6 +140,13 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
     }
     fun eliminarEvento(evento: Evento) {
         viewModelScope.launch {
+            // Cancelamos primero la alarma asociada — si la alarma dispara después
+            // del borrado, el receiver mostraría una notificación de un evento que
+            // ya no existe.
+            if (evento.idLocal > 0L) {
+                EventoAlarmManager.cancelar(getApplication(), evento.idLocal)
+            }
+
             try {
                 // A. Borrado local inmediato (UI se actualiza al instante)
                 if (evento.id != null) {
@@ -132,6 +169,27 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
     }
     fun limpiarError() {
         _error.value = null
+    }
+
+    /**
+     * Si el usuario activó recordatorio pero falta un permiso, emitimos
+     * [problemaPermiso] para que la UI muestre el diálogo apropiado.
+     * Si recordatorio=false o todo salió bien, no emitimos nada.
+     */
+    private fun evaluarResultadoProgramacion(
+        recordatorioPedido: Boolean,
+        resultado: EventoAlarmManager.ResultadoProgramacion
+    ) {
+        if (!recordatorioPedido) return  // el usuario no quería notificación
+        when (resultado) {
+            EventoAlarmManager.ResultadoProgramacion.FALTA_PERMISO_NOTIFICACIONES,
+            EventoAlarmManager.ResultadoProgramacion.FALTA_EXCLUSION_BATERIA,
+            EventoAlarmManager.ResultadoProgramacion.FALTA_PERMISO_EXACTAS,
+            EventoAlarmManager.ResultadoProgramacion.FALTA_PERMISO_FULLSCREEN -> {
+                _problemaPermiso.value = resultado
+            }
+            else -> { /* OK_EXACTA, OK_INEXACTA, CANCELADA, ERROR — no requiere diálogo */ }
+        }
     }
     fun migrarEventosLocales() {
         viewModelScope.launch {

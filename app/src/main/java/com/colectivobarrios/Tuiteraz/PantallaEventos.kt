@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.DateRange
 import androidx.compose.material3.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -36,6 +38,7 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 import com.colectivobarrios.Tuiteraz.Evento
+import com.colectivobarrios.Tuiteraz.ui.componentes.coloresParaPrioridad
 import com.colectivobarrios.Tuiteraz.ui.viewmodel.EventosViewModel
 
 @Composable
@@ -388,21 +391,81 @@ fun CuadriculaDias(
 
 @Composable
 fun TarjetaEventoDiario(evento: Evento) {
+    // Colores derivados de la prioridad — mismo helper que usa la tarjeta de
+    // próximos eventos en la pantalla de inicio, así el lenguaje visual es
+    // idéntico en ambas pantallas.
+    val colores = coloresParaPrioridad(evento.prioridad, MaterialTheme.colorScheme)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer).padding(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Píldora de hora — coloreada por prioridad para que el nivel de
+            // urgencia salte a la vista. El "split(" ")[0]" se mantiene por si
+            // viene "10:30 AM" — extraemos solo la hora.
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colores.contenedor)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text(text = evento.hora.split(" ")[0], style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
+                Text(
+                    text = evento.hora.split(" ")[0],
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colores.onContenedor,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(text = evento.titulo, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            // Título + etiqueta sutil de prioridad
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = evento.titulo,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                // Etiqueta de prioridad (solo si no es la default Media)
+                if (!evento.prioridad.equals("Media", ignoreCase = true)) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Prioridad ${evento.prioridad.lowercase()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colores.acento,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Campana de recordatorio — visualmente confirma que está armado
+            if (evento.recordatorio) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(colores.contenedor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Notifications,
+                        contentDescription = "Con recordatorio",
+                        tint = colores.acento,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
     }
 }

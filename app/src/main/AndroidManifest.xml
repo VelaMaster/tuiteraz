@@ -5,8 +5,24 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <!-- Para reprogramar el widget tras un reinicio del teléfono -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Notificaciones de eventos: alarmas exactas y full-screen para prioridad Alta -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Permite que la activity de alarma se muestre encima del lock screen -->
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <!-- Para pedir al usuario que excluya la app de optimizaciones de batería.
+         Sin esto, en Samsung/Xiaomi/Huawei las alarmas en background NO disparan
+         confiablemente. Justificamos el uso porque somos una app de "alarma/recordatorios". -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:ignore="BatteryLife" />
 
     <application
         android:allowBackup="true"
@@ -61,6 +77,28 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+
+        <!-- Receiver que dispara cuando llega la hora de un recordatorio de evento.
+             NO necesita intent-filter porque lo invocamos siempre con un PendingIntent
+             explícito desde EventoAlarmManager. exported=false porque solo lo usamos
+             internamente. -->
+        <receiver
+            android:name=".notificaciones.RecordatorioEventoReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Activity full-screen estilo alarma para eventos de prioridad Alta.
+             Aparece SOBRE la pantalla de bloqueo. excludeFromRecents para que no
+             quede visible en la lista de apps recientes. launchMode=singleTask para
+             que si llega otra alarma encima reemplace la anterior. -->
+        <activity
+            android:name=".notificaciones.AlarmaEventoActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.Balance" />
     </application>
 
 </manifest>

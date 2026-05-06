@@ -12,8 +12,15 @@ interface EventoDao {
     @Query("SELECT * FROM eventos ORDER BY fecha ASC")
     fun obtenerTodos(): Flow<List<EventoEntity>>
 
+    /**
+     * Devuelve el idLocal del registro insertado o actualizado.
+     * Cuando es un INSERT nuevo, Room retorna el id autogenerado.
+     * Cuando es un UPDATE/REPLACE, retorna el rowid de la fila reemplazada
+     * (que coincide con el idLocal porque idLocal es PrimaryKey).
+     * Necesitamos el id para programar el AlarmManager con un requestCode estable.
+     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertarOActualizar(evento: EventoEntity)
+    suspend fun insertarOActualizar(evento: EventoEntity): Long
 
     @Query("SELECT * FROM eventos WHERE sincronizado = 0")
     suspend fun obtenerPendientesDeSubir(): List<EventoEntity>

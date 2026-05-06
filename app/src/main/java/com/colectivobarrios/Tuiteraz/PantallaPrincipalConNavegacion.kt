@@ -89,12 +89,22 @@ fun PantallaPrincipalConNavegacion(
 
     val errorSupabase by eventosViewModel.error.collectAsStateWithLifecycle()
     val fechaGlobal by eventosViewModel.fechaSeleccionada.collectAsStateWithLifecycle()
+    val problemaPermiso by eventosViewModel.problemaPermiso.collectAsStateWithLifecycle()
 
     LaunchedEffect(errorSupabase) {
         errorSupabase?.let {
             Toast.makeText(contexto, it, Toast.LENGTH_LONG).show()
             eventosViewModel.limpiarError()
         }
+    }
+
+    // Cuando programar una alarma falla por falta de permiso, mostramos un
+    // diálogo que lleva al usuario directo a los ajustes correctos.
+    problemaPermiso?.let { problema ->
+        com.colectivobarrios.Tuiteraz.notificaciones.DialogoPermisoNotificaciones(
+            problema = problema,
+            onDismiss = { eventosViewModel.limpiarProblemaPermiso() }
+        )
     }
 
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(state = rememberTopAppBarState())

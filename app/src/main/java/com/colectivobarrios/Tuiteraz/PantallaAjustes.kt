@@ -158,7 +158,7 @@ fun PantallaAjustes(
             ConfigAjuste(
                 icono = Icons.Outlined.Info,
                 titulo = "Acerca de Tu i teraz",
-                descripcion = "Versión 1.0",
+                descripcion = "Versión 2.0",
                 colorIcono = { MaterialTheme.colorScheme.outline },
                 tieneSwitch = false,
                 onClick = onAcercaDeClick
